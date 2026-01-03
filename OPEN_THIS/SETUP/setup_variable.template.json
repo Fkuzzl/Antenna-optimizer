@@ -1,0 +1,53 @@
+{
+  "YOUR_IP_ADDRESS": "AUTO_DETECTED",
+  "SERVER_PORT": 3001,
+  "MATLAB_PATH": "AUTO_DETECTED",
+  "PYTHON_PATH": "AUTO_DETECTED",
+  "config_version": "2.0.0",
+  "last_updated": "AUTO_GENERATED",
+  "matlab": {
+    "installation_paths": []
+  },
+  "python": {
+    "executable": "AUTO_DETECTED"
+  },
+  "server": {
+    "host": "AUTO_DETECTED",
+    "port": 3001,
+    "websocket": {
+      "enabled": true,
+      "path": "/ws"
+    }
+  },
+  "expo": {
+    "port": 8081
+  },
+  "hfss": {
+    "process_names": [
+      "ansysedt.exe",
+      "anshfss.exe",
+      "ansysli_server.exe",
+      "ansysacad.exe",
+      "maxwell.exe",
+      "q3d.exe"
+    ]
+  },
+  "paths": {
+    "project_root": "AUTO_GENERATED",
+    "uploads_dir": "AUTO_GENERATED",
+    "gnd_files_dir": "AUTO_GENERATED",
+    "config_dir": "AUTO_GENERATED",
+    "scripts_dir": "AUTO_GENERATED",
+    "test_files_dir": "AUTO_GENERATED"
+  },
+  "network": {
+    "subnet": "AUTO_DETECTED",
+    "allowed_origins": [],
+    "cors_enabled": true
+  },
+  "performance": {
+    "cache_ttl_ms": 1000,
+    "websocket_heartbeat_ms": 2000,
+    "status_polling_interval_ms": 3000
+  }
+}

@@ -1,0 +1,16 @@
+# Python Dependencies for MATLAB Antenna Optimizer Project
+# Install with:
+#pip install -r requirements.txt
+#npm install
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Excel File Handling (for integrated_results_manager.py)
+openpyxl>=3.1.0
+
+# DXF File Processing (for DXF geometry import)
+ezdxf>=1.0.0
+
+# Optional but recommended
+python-dateutil>=2.8.0
