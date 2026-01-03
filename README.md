@@ -119,9 +119,5 @@ pip install -r OPEN_THIS/SETUP/requirements.txt
 - **Data Processing**: Python 3.8+ (pandas, openpyxl)
 - **Optimization**: MATLAB R2020b+ + HFSS 2022 R2
 
-## License
-
-[Your License Here]
-
 ## Author
 Mario Ma (https://github.com/Fkuzzl)
