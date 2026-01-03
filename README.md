@@ -10,59 +10,12 @@ Automated antenna design optimization system using MATLAB-HFSS integration with 
 - **Custom ground plane import** import (DXF format)
 - **Automated MATLAB-HFSS** integration
 
-## Creating Your Own Repository
-
-If you're starting fresh and want to push this project to your own GitHub repository:
-
-**Step 1: Create Repository on GitHub**
-1. Go to [GitHub](https://github.com/) and sign in
-2. Click the **+** icon (top right) → **New repository**
-3. Enter repository name (e.g., `antenna-optimizer`)
-4. Choose **Public** or **Private**
-5. **Do NOT** initialize with README, .gitignore, or license
-6. Click **Create repository**
-
-**Step 2: Initialize Local Git Repository**
-```bash
-# Navigate to your project folder
-cd C:\Coding_Environment\fyp_project_current
-
-# Initialize git (if not already initialized)
-git init
-
-# Add all files to staging
-git add .
-
-# Create first commit
-git commit -m "Initial commit: Antenna optimization system"
-```
-
-**Step 3: Connect to Remote Repository**
-```bash
-# Add your GitHub repository as remote (replace YOUR_USERNAME)
-git remote add origin https://github.com/YOUR_USERNAME/antenna-optimizer.git
-
-# Verify remote was added
-git remote -v
-```
-
-**Step 4: Push to GitHub**
-```bash
-# Push to main branch
-git branch -M main
-git push -u origin main
-```
-
-**Step 5: Verify Upload**
-- Refresh your GitHub repository page
-- You should see all project files uploaded
-
 ### Installation
 
 **Step 1: Clone Repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/antenna-optimizer.git
-cd antenna-optimizer
+git clone https://github.com/Fkuzzl/Antenna-optimizer.git
+cd Antenna-optimizer
 ```
 
 **Step 2: Install Prerequisites**
