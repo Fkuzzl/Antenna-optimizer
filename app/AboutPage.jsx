@@ -59,7 +59,7 @@ const AboutPage = ({ onBack }) => {
           <Text style={styles.subtitle}>Advanced antenna optimization with MATLAB Live Scripts and HFSS integration</Text>
           
           <View style={styles.headerVersionInfo}>
-            <Text style={styles.headerVersionText}>Version 1.0.2</Text>
+            <Text style={styles.headerVersionText}>Version 1.1.0</Text>
             <Text style={styles.headerBuildText}>Build 2026.01.03</Text>
           </View>
         </View>

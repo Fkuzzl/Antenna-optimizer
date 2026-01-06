@@ -1,8 +1,8 @@
 {
   "expo": {
     "scheme": "myapp", 
-    "name": "ReactNative_start",
-    "slug": "ReactNative_start",
+    "name": "Antenna-optimizer",
+    "slug": "Antenna-optimizer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
