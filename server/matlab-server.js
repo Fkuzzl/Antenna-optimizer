@@ -9,6 +9,44 @@ const WebSocket = require('ws');
 const http = require('http');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
+const winston = require('winston');
+
+// Configure winston logger with file rotation and proper levels
+const logger = winston.createLogger({
+    level: process.env.LOG_LEVEL || 'info',
+    format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        winston.format.errors({ stack: true }),
+        winston.format.printf(({ timestamp, level, message, stack }) => {
+            return `${timestamp} [${level.toUpperCase()}]: ${stack || message}`;
+        })
+    ),
+    transports: [
+        new winston.transports.File({ 
+            filename: path.join(__dirname, 'logs', 'error.log'), 
+            level: 'error',
+            maxsize: 10485760, // 10MB
+            maxFiles: 5
+        }),
+        new winston.transports.File({ 
+            filename: path.join(__dirname, 'logs', 'combined.log'),
+            maxsize: 10485760, // 10MB
+            maxFiles: 5
+        })
+    ]
+});
+
+// Add console transport in development
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+        format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.printf(({ timestamp, level, message }) => {
+                return `${timestamp} [${level}]: ${message}`;
+            })
+        )
+    }));
+}
 
 // Provide a safe uuidv4 helper (uses crypto.randomUUID when available)
 const crypto = require('crypto');
@@ -100,6 +138,7 @@ const setupConfig = require('../OPEN_THIS/SETUP/setup_loader.js');
 // Validate configuration on startup
 const validation = setupConfig.validate();
 if (!validation.isValid) {
+    logger.error('CONFIGURATION ERROR', { errors: validation.errors });
     console.error('\n❌ CONFIGURATION ERROR:\n');
     validation.errors.forEach(err => console.error(`   ${err}`));
     console.error('\n💡 Run setup: node OPEN_THIS/SETUP/quick_setup.js\n');
@@ -110,16 +149,28 @@ const serverConfig = setupConfig.getServerConfig();
 const performanceSettings = setupConfig.getPerformanceSettings();
 const networkConfig = setupConfig.getNetworkConfig();
 
+// Timeout and interval constants for consistent behavior
+const TIMEOUTS = {
+    PROCESS_TERMINATION_WAIT: 3000,      // Wait time after killing MATLAB process
+    PROCESS_VERIFICATION_WAIT: 2000,      // Wait before verifying process stopped
+    SOCKET_TIMEOUT: 10000,                // HTTP socket timeout
+    CACHE_CLEANUP_INTERVAL: 30000,        // File system cache cleanup interval
+    CONNECTION_CLEANUP_INTERVAL: 5000,    // Idle connection cleanup interval
+    ITERATION_CHECK_INTERVAL: 5000,       // Automatic iteration tracking interval
+    CONNECTION_MANAGER_INTERVAL: 3000,    // Connection health monitoring interval
+    GRACEFUL_SHUTDOWN_DELAY: 1000,        // Delay before process.exit after cleanup
+    WEBSOCKET_HEARTBEAT: 2000,            // WebSocket heartbeat interval
+    STATUS_POLLING_INTERVAL: 3000         // Status polling for fallback HTTP
+};
+
 // Global error handlers to prevent server crashes
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  console.error('Stack:', error.stack);
+  logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
   // Don't exit - log and continue
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise);
-  console.error('Reason:', reason);
+  logger.error('Unhandled Rejection', { reason, promise });
   // Don't exit - log and continue
 });
 
@@ -209,15 +260,19 @@ let projectIterationStates = new Map();
 let fileSystemCache = new Map();
 const CACHE_TTL = performanceSettings.cache_ttl_ms || 1000; // Cache timeout from config
 
+// Store interval IDs for cleanup on shutdown
+const activeIntervals = [];
+
 // Clean up old cache entries every 30 seconds
-setInterval(() => {
+const cacheCleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, value] of fileSystemCache.entries()) {
         if (now - value.timestamp > CACHE_TTL * 10) { // Keep for 10x TTL before cleanup
             fileSystemCache.delete(key);
         }
     }
-}, 30000);
+}, TIMEOUTS.CACHE_CLEANUP_INTERVAL);
+activeIntervals.push(cacheCleanupInterval);
 
 // Function to detect MATLAB installation
 function detectMatlabInstallation() {
@@ -395,7 +450,7 @@ app.get('/api/variables', async (req, res) => {
     const configContent = await fsPromises.readFile(configPath, 'utf-8');
     const configData = JSON.parse(configContent);
     
-    console.log(`✅ Loaded ${configData.variables.length} variables from configuration`);
+    // Variables loaded silently
     
     res.json({
       success: true,
@@ -420,7 +475,7 @@ app.get('/api/matlab/check', (req, res) => {
     const matlabPath = detectMatlabInstallation();
     
     if (matlabPath) {
-      console.log(`✅ MATLAB installation check: Found at ${matlabPath}`);
+      // MATLAB found silently
       res.json({
         success: true,
         matlabPath: matlabPath,
@@ -619,6 +674,7 @@ app.post('/api/matlab/run', strictRateLimiter, async (req, res) => {
         });
         
         matlabProcess.on('error', (error) => {
+            logger.error('MATLAB process error', { error: error.message, stack: error.stack });
             console.error(`❌ MATLAB error: ${error.message}`);
             currentExecutionState.isRunning = false;
             matlabProcess = null;
@@ -643,7 +699,7 @@ app.post('/api/matlab/run', strictRateLimiter, async (req, res) => {
             } else {
                 clearInterval(processCheckInterval);
             }
-        }, 5000);
+        }, TIMEOUTS.CONNECTION_CLEANUP_INTERVAL);
         
         res.json({
             success: true,
@@ -819,7 +875,7 @@ app.get('/api/matlab/status', async (req, res) => {
         
         // Only log when state changes
         if (matlabRunning !== previousState.matlabRunning || currentExecutionState.isRunning !== previousState.appStateRunning) {
-            console.log(`🔍 Status changed - MATLAB process: ${matlabRunning}, app state: ${currentExecutionState.isRunning}`);
+            // Status changed silently
             previousState.matlabRunning = matlabRunning;
             previousState.appStateRunning = currentExecutionState.isRunning;
         }
@@ -829,12 +885,12 @@ app.get('/api/matlab/status', async (req, res) => {
         let stateChanged = false;
         
         if (currentExecutionState.isRunning && !matlabRunning) {
-            console.log('📄 MATLAB process stopped, updating app state');
+            // MATLAB stopped, updating state
             currentExecutionState.isRunning = false;
             matlabProcess = null;
             stateChanged = true;
         } else if (!currentExecutionState.isRunning && matlabRunning) {
-            console.log('📄 External MATLAB detected, updating app state');
+            // External MATLAB detected
             currentExecutionState.isRunning = true;
             // Try to get process info if we don't have it
             if (!currentExecutionState.fileName) {
@@ -1002,7 +1058,7 @@ app.get('/api/matlab/iteration-count', (req, res) => {
             
             // Only log when iteration count actually changes for this specific project
             if (iterations.length !== projectState.iterationCount) {
-                console.log(`✅ Project ${path.basename(projectPath)}: ${iterations.length} iterations detected`);
+                // Project iterations detected silently
                 projectState.iterationCount = iterations.length;
                 projectState.currentIteration = maxIteration;
                 projectState.lastLogTime = Date.now();
@@ -2287,18 +2343,65 @@ app.post('/api/integrated-results/read', async (req, res) => {
     }
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-    console.log('\nShutting down MATLAB server gracefully...');
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+    console.log(`\n📛 Received ${signal}, shutting down gracefully...`);
     
-    if (matlabProcess) {
-        console.log('Stopping MATLAB process...');
-        matlabProcess.kill('SIGINT');
+    // Stop accepting new connections
+    httpServer.close(() => {
+        console.log('✅ HTTP server closed');
+    });
+    
+    // Close all WebSocket connections
+    if (wss) {
+        console.log(`🔌 Closing ${wsClients.size} WebSocket connections...`);
+        wsClients.forEach(client => {
+            try {
+                client.close(1000, 'Server shutting down');
+            } catch (err) {
+                console.error('Error closing WebSocket:', err.message);
+            }
+        });
+        wss.close(() => {
+            console.log('✅ WebSocket server closed');
+        });
     }
     
-    console.log('Server closed.');
-    process.exit(0);
-});
+    // Stop MATLAB process
+    if (matlabProcess) {
+        console.log('🛑 Stopping MATLAB process...');
+        try {
+            matlabProcess.kill('SIGTERM');
+        } catch (err) {
+            console.error('Error stopping MATLAB:', err.message);
+        }
+    }
+    
+    // Clear all intervals
+    console.log(`🧹 Clearing ${activeIntervals.length} active intervals...`);
+    activeIntervals.forEach(interval => clearInterval(interval));
+    activeIntervals.length = 0;
+    
+    // Close active HTTP connections
+    activeConnections.forEach(socket => {
+        try {
+            socket.destroy();
+        } catch (err) {
+            console.error('Error closing socket:', err.message);
+        }
+    });
+    
+    console.log('✅ Server shut down cleanly');
+    
+    // Give time for cleanup, then exit
+    setTimeout(() => {
+        process.exit(0);
+    }, TIMEOUTS.GRACEFUL_SHUTDOWN_DELAY);
+};
+
+// Register shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start the server
 const httpServer = http.createServer(app);
@@ -2320,7 +2423,7 @@ let lastBroadcastData = {
 // WebSocket connection handler
 wss.on('connection', (ws, req) => {
   const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-  console.log(`🔗 WebSocket client connected: ${clientId}`);
+  // Client connected silently
   
   wsClients.add(ws);
   
@@ -2376,7 +2479,7 @@ wss.on('connection', (ws, req) => {
         timestamp: Date.now()
       }));
       
-      console.log(`📱 Sent current status to new client: ${currentExecutionState.isRunning ? 'Running' : 'Ready'}`);
+      // Status sent silently
     }).catch(err => console.error('Error getting HFSS processes for new client:', err));
   }).catch(err => console.error('Error getting MATLAB processes for new client:', err));
   
@@ -2400,7 +2503,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      console.log(`📨 WebSocket message from ${clientId}:`, data.type);
+      // Message received silently
       
       // Handle different message types
       switch (data.type) {
@@ -2482,9 +2585,7 @@ function broadcastToClients(type, data, forceUpdate = false) {
       }
     });
     
-    if (successCount > 0) {
-      console.log(`📡 Broadcasted ${type} to ${successCount} clients`);
-    }
+    // Broadcasting completed silently (only log errors)
     if (errorCount > 0) {
       console.log(`⚠️ Failed to send to ${errorCount} clients (removed)`);
     }
@@ -2492,6 +2593,12 @@ function broadcastToClients(type, data, forceUpdate = false) {
 }
 
 const server = httpServer.listen(PORT, '0.0.0.0', () => {
+    logger.info(`MATLAB & HFSS Server started`, {
+        host: `http://${serverConfig.host}:${PORT}`,
+        websocket: serverConfig.websocket.url,
+        config: 'OPEN_THIS/SETUP/setup_variable.json',
+        features: ['Real-time WebSocket', 'Zero TIME_WAIT', 'Iteration tracking', 'Integrated Excel results']
+    });
     console.log(`🚀 MATLAB & HFSS Server running on http://${serverConfig.host}:${PORT}`);
     console.log(`🔗 WebSocket server running on ${serverConfig.websocket.url}`);
     console.log(`📋 Configuration loaded from: OPEN_THIS/SETUP/setup_variable.json`);
@@ -2522,7 +2629,7 @@ server.on('connection', (socket) => {
     
     // Shorter keep-alive and timeout for faster cleanup
     socket.setKeepAlive(true, 1000); // 1 second initial delay
-    socket.setTimeout(10000); // 10 second socket timeout
+    socket.setTimeout(TIMEOUTS.SOCKET_TIMEOUT); // 10 second socket timeout
     
     // Force socket reuse options
     socket.setNoDelay(true); // Disable Nagle's algorithm for faster response
@@ -2545,7 +2652,7 @@ server.on('connection', (socket) => {
 });
 
 // Aggressive connection cleanup - force close idle connections every 5 seconds
-setInterval(() => {
+const connectionCleanupInterval = setInterval(() => {
     if (activeConnections.size > 10) {
         console.log(`🧹 Cleaning up ${activeConnections.size} connections`);
         let cleaned = 0;
@@ -2556,10 +2663,11 @@ setInterval(() => {
             }
         });
     }
-}, 5000);
+}, TIMEOUTS.CONNECTION_CLEANUP_INTERVAL);
+activeIntervals.push(connectionCleanupInterval);
 
 // Automatic iteration tracking - check and broadcast iterations every 5 seconds when MATLAB is running
-setInterval(async () => {
+const iterationTrackingInterval = setInterval(async () => {
     // Only check if MATLAB is running and we have a valid project path
     if (currentExecutionState.isRunning && currentExecutionState.filePath) {
         try {
@@ -2640,7 +2748,6 @@ setInterval(async () => {
                             
                             // Broadcast to WebSocket clients
                             broadcastToClients('iterations', result);
-                            console.log(`📊 Iteration update: ${iterations.length} iterations (current: ${maxIteration})`);
                         }
                     }
                 }
@@ -2650,7 +2757,8 @@ setInterval(async () => {
             // Full errors are logged in the HTTP endpoint
         }
     }
-}, 5000);
+}, TIMEOUTS.ITERATION_CHECK_INTERVAL);
+activeIntervals.push(iterationTrackingInterval);
 
 // Automatic connection management system
 let connectionStats = {
@@ -2679,7 +2787,7 @@ let connectionStats = {
 };
 
 // Intelligent connection monitor and auto-manager
-let connectionManagerInterval = setInterval(async () => {
+const connectionManagerInterval = setInterval(async () => {
     // Get current connection statistics
     const { exec } = require('child_process');
     
@@ -2776,8 +2884,8 @@ let connectionManagerInterval = setInterval(async () => {
             }
         }
         
-        // Log adaptations (throttled to prevent spam)
-        if (adaptationsMade.length > 0 && now - connectionStats.lastCleanup > 10000) {
+        // Log adaptations (throttled to prevent spam) - only log every 30 seconds
+        if (adaptationsMade.length > 0 && now - connectionStats.lastCleanup > 30000) {
             console.log(`🤖 Auto-manager: ${adaptationsMade.join(', ')}`);
             console.log(`📊 Current: ${stats.established} active, ${stats.timeWait} TIME_WAIT`);
             connectionStats.lastCleanup = now;
@@ -2785,7 +2893,7 @@ let connectionManagerInterval = setInterval(async () => {
         
         // Health scoring and status
         const healthScore = Math.max(0, 100 - (stats.timeWait * 1.5) - (stats.established * 5));
-        if (healthScore < 50 && now - connectionStats.lastCleanup > 30000) {
+        if (healthScore < 30 && now - connectionStats.lastCleanup > 60000) {
             console.log(`⚠️ Connection health: ${healthScore.toFixed(0)}/100 - Auto-managing...`);
             connectionStats.lastCleanup = now;
         }
@@ -2851,13 +2959,14 @@ let connectionManagerInterval = setInterval(async () => {
         }
         
         if (shouldBroadcast && broadcastReasons.length > 0) {
-            console.log(`📡 Broadcasting connection_stats: ${broadcastReasons.join(', ')}`);
+            // Broadcasting connection stats silently
             broadcastToClients('connection_stats', connectionData, true);
             lastBroadcastData.connection_stats = connectionData;
             connectionStats.lastBroadcastTime = now;
         }
     });
-}, 3000); // Check every 3 seconds for responsive management
+}, TIMEOUTS.CONNECTION_MANAGER_INTERVAL); // Check every 3 seconds for responsive management
+activeIntervals.push(connectionManagerInterval);
 
 // ================================================================
 // CUSTOM GND IMPORT API ENDPOINTS
