@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch, Dimensions, Platform, Image, TextInput, Keyboard } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Dimensions, Platform, Image, TextInput, Keyboard } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import GroundPlaneConfigurator from './GroundPlaneConfigurator';
-import AppConfig, { PathUtils } from './app_config';
+import AppConfig, { PathUtils, showAlert } from './app_config';
 
 const { width } = Dimensions.get('window');
 
@@ -132,11 +132,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         
         // Show error to user
         const errorMsg = `Failed to load variables from server:\n${error.message}\n\nPlease ensure the server is running.`;
-        if (Platform.OS === 'web') {
-          window.alert(errorMsg);
-        } else {
-          Alert.alert('Loading Error', errorMsg);
-        }
+        showAlert('Loading Error', errorMsg);
       } finally {
         setIsLoadingVariables(false);
       }
@@ -149,11 +145,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
   const checkFModelPath = async () => {
     if (!projectPath || !projectPath.trim()) {
       const errorMessage = 'Please set a project location first.';
-      if (Platform.OS === 'web') {
-        window.alert(errorMessage);
-      } else {
-        Alert.alert('No Project Path', errorMessage);
-      }
+      showAlert('No Project Path', errorMessage);
       return;
     }
 
@@ -200,19 +192,11 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         
         const successMessage = `F_Model_Element files found and ready!\n\nCreating new file will replace existing files.`;
         
-        if (Platform.OS === 'web') {
-          window.alert(successMessage);
-        } else {
-          Alert.alert('Files Found', successMessage);
-        }
+        showAlert('Files Found', successMessage);
       } else {
         const errorMessage = `F_Model_Element files not found.\n\nSelect variables and create the file to continue.`;
         
-        if (Platform.OS === 'web') {
-          window.alert(errorMessage);
-        } else {
-          Alert.alert('File Not Found', errorMessage);
-        }
+        showAlert('File Not Found', errorMessage);
       }
       
     } catch (error) {
@@ -233,11 +217,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
       
       errorMessage += `Please ensure the server is running at ${AppConfig.server.host}:${AppConfig.server.port}`;
       
-      if (Platform.OS === 'web') {
-        window.alert(errorMessage);
-      } else {
-        Alert.alert('Connection Failed', errorMessage);
-      }
+      showAlert('Connection Failed', errorMessage);
     } finally {
       setIsCheckingPath(false);
     }
@@ -311,20 +291,12 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
       : antennaVariables.length - excludedVariables.size;
     
     if (variablesToOptimize === 0) {
-      if (Platform.OS === 'web') {
-        window.alert('Please optimize at least one variable.');
-      } else {
-        Alert.alert('No Variables', 'Please optimize at least one variable.');
-      }
+      showAlert('No Variables', 'Please optimize at least one variable.');
       return;
     }
 
     if (!projectPath || !projectPath.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Please set a project path first.');
-      } else {
-        Alert.alert('No Project Path', 'Please set a project path first.');
-      }
+      showAlert('No Project Path', 'Please set a project path first.');
       return;
     }
 
@@ -364,29 +336,16 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
           completionMessage = `File created successfully!\n\n${optimizedCount} variables optimizing.\nGround plane configured.\nExisting data preserved.`;
         }
 
-        if (Platform.OS === 'web') {
-          window.alert(completionMessage);
-          // Auto-navigate back to MATLAB studio after user clicks OK
-          // Small delay to ensure alert closes properly
-          setTimeout(() => onBack(), 100);
-        } else {
-          Alert.alert('✅ Complete', completionMessage, [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Auto-navigate back to MATLAB studio after user clicks OK
-                onBack();
-              }
-            }
-          ]);
-        }
+        showAlert('✅ Complete', completionMessage, [{
+          text: 'OK',
+          onPress: () => {
+            // Auto-navigate back to MATLAB studio after user clicks OK
+            setTimeout(() => onBack(), Platform.OS === 'web' ? 100 : 0);
+          }
+        }]);
       } catch (error) {
         const errorMessage = `Process failed: ${error.message || error}`;
-        if (Platform.OS === 'web') {
-          window.alert(errorMessage);
-        } else {
-          Alert.alert('Error', errorMessage);
-        }
+        showAlert('Error', errorMessage);
       }
     };
 
@@ -397,7 +356,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         await proceedWithCreation();
       }
     } else {
-      Alert.alert(
+      showAlert(
         'Confirm Creation',
         confirmMessage,
         [
@@ -486,11 +445,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               } else {
                 console.log(`⚠️ F_GND_Import.m generation failed: ${gndImportResult.message}`);
                 const errorMsg = `Custom GND import failed:\n${gndImportResult.message}`;
-                if (Platform.OS === 'web') {
-                  window.alert(errorMsg);
-                } else {
-                  Alert.alert('Warning', errorMsg);
-                }
+                showAlert('Warning', errorMsg);
               }
             } else {
               // Parametric GND - update F_Model_Element.m with ground plane variables
@@ -520,21 +475,13 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               } else {
                 console.log(`⚠️ Ground plane update failed: ${groundPlaneResult.message}`);
                 const errorMsg = `Ground plane update failed:\n${groundPlaneResult.message}`;
-                if (Platform.OS === 'web') {
-                  window.alert(errorMsg);
-                } else {
-                  Alert.alert('Warning', errorMsg);
-                }
+                showAlert('Warning', errorMsg);
               }
             }
           } catch (groundPlaneError) {
             console.log(`⚠️ Ground plane configuration failed: ${groundPlaneError.message}`);
             const errorMsg = `Ground plane configuration failed:\n${groundPlaneError.message}`;
-            if (Platform.OS === 'web') {
-              window.alert(errorMsg);
-            } else {
-              Alert.alert('Warning', errorMsg);
-            }
+            showAlert('Warning', errorMsg);
           }
         } else {
           console.log(`ℹ️ Ground plane not configured by user - generating empty F_GND_Import.m`);
@@ -684,11 +631,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
                      `Antenna at (${config.GND_xPos.toFixed(1)}, ${config.GND_yPos.toFixed(1)})mm`;
           }
           
-          if (Platform.OS === 'web') {
-            window.alert(message);
-          } else {
-            Alert.alert('Configuration Saved', message);
-          }
+          showAlert('Configuration Saved', message);
         }}
         projectPath={projectPath}
       />
