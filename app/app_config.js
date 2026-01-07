@@ -5,6 +5,7 @@
 //    Edit: OPEN_THIS/SETUP/setup_variable.json (ONE FILE FOR ALL CONFIGURATION)
 //    This file will automatically read those values.
 
+import { Alert, Platform } from 'react-native';
 import setupVariableConfig from '../OPEN_THIS/SETUP/setup_variable.json';
 
 // Load configuration from the centralized setup file
@@ -84,6 +85,105 @@ export const validateConfig = () => {
     errors,
     source: 'OPEN_THIS/SETUP/setup_variable.json'
   };
+};
+
+// Path utility functions to eliminate code duplication
+export const PathUtils = {
+  /**
+   * Extract project root directory from MATLAB file path
+   * Handles both Windows (\) and Unix (/) path separators
+   * Removes the .mlx or .m filename from the end
+   * @param {string} filePath - Full path to MATLAB file
+   * @returns {string} - Directory containing the file
+   */
+  getProjectRoot: (filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+      return '';
+    }
+    // Remove filename ending with .mlx or .m (case insensitive)
+    return filePath.replace(/[\\\/][^\\\/]*\.mlx?$/i, '');
+  },
+  
+  /**
+   * Extract just the filename from a full path
+   * @param {string} filePath - Full file path
+   * @returns {string} - Filename only
+   */
+  getFileName: (filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+      return '';
+    }
+    // Split by both \ and / separators and return last element
+    return filePath.split(/[\\\/]/).pop() || '';
+  },
+  
+  /**
+   * Get the directory portion of a path (without filename)
+   * Works with both Windows and Unix paths
+   * @param {string} filePath - Full file path
+   * @returns {string} - Directory path only
+   */
+  getDirectory: (filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+      return '';
+    }
+    const lastBackslash = filePath.lastIndexOf('\\');
+    const lastSlash = filePath.lastIndexOf('/');
+    const lastSeparator = Math.max(lastBackslash, lastSlash);
+    
+    if (lastSeparator === -1) {
+      return ''; // No directory separator found
+    }
+    
+    return filePath.substring(0, lastSeparator);
+  },
+  
+  /**
+   * Normalize path separators to forward slashes (for display)
+   * @param {string} filePath - File path with any separators
+   * @returns {string} - Path with forward slashes
+   */
+  normalize: (filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+      return '';
+    }
+    return filePath.replace(/\\/g, '/');
+  }
+};
+
+/**
+ * Unified alert utility for consistent alerts across web and mobile
+ * Replaces window.alert on web with proper Alert.alert for better UX
+ * @param {string} title - Alert title
+ * @param {string} message - Alert message
+ * @param {Array} buttons - Array of button objects with text and onPress (optional)
+ */
+export const showAlert = (title, message, buttons = [{ text: 'OK' }]) => {
+  if (Platform.OS === 'web') {
+    // For web, construct a formatted message
+    const fullMessage = `${title}\n\n${message}`;
+    
+    // If we have multiple buttons or a cancel button, use confirm()
+    if (buttons.length > 1 || buttons.some(b => b.style === 'cancel')) {
+      const confirmed = window.confirm(fullMessage);
+      
+      // Find and call the appropriate button handler
+      if (confirmed) {
+        const okButton = buttons.find(b => b.style !== 'cancel') || buttons[0];
+        if (okButton.onPress) okButton.onPress();
+      } else {
+        const cancelButton = buttons.find(b => b.style === 'cancel');
+        if (cancelButton && cancelButton.onPress) cancelButton.onPress();
+      }
+    } else {
+      // Simple alert with OK button
+      window.alert(fullMessage);
+      if (buttons[0].onPress) buttons[0].onPress();
+    }
+  } else {
+    // Use native Alert for mobile platforms
+    Alert.alert(title, message, buttons);
+  }
 };
 
 export default AppConfig;
