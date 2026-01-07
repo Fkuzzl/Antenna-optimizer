@@ -986,6 +986,17 @@ app.post('/api/matlab/apply-variables', (req, res) => {
             });
         }
 
+        // Validate upper bound for variable count (security & performance)
+        if (variableIds.length > 100) {
+            console.log(`❌ Error: Too many variables requested (${variableIds.length})`);
+            return res.status(400).json({
+                success: false,
+                message: 'Too many variables (maximum 100 supported)',
+                requested: variableIds.length,
+                maximum: 100
+            });
+        }
+
         // Removed 20-variable limit - now supports full design variable set (82 variables)
         console.log(`✅ Received request to apply ${variableIds.length} variables`);
         console.log(`🔧 Variable IDs: [${variableIds.join(', ')}]`);
@@ -1013,8 +1024,8 @@ app.post('/api/matlab/apply-variables', (req, res) => {
                 console.log(`   📝 stderr: ${stderr}`);
                 return res.status(500).json({
                     success: false,
-                    message: 'Failed to execute Python script',
-                    error: error.message
+                    message: 'Failed to execute Python script'
+                    // Internal error details removed for security
                 });
             }
             
@@ -1030,8 +1041,8 @@ app.post('/api/matlab/apply-variables', (req, res) => {
                 message: `F_Model_Element.m updated with ${variableIds.length} variables (seeds 1-${variableIds.length})`,
                 variableCount: variableIds.length,
                 variableIds: variableIds,
-                seedRange: `1-${variableIds.length}`,
-                pythonOutput: stdout
+                seedRange: `1-${variableIds.length}`
+                // pythonOutput removed - internal details only in server logs
             });
         });
 
@@ -1361,9 +1372,7 @@ app.post('/api/matlab/generate-gnd-import', async (req, res) => {
                     
                     return res.status(500).json({
                         success: false,
-                        message: 'Failed to generate empty F_GND_Import.m',
-                        error: error.message,
-                        stderr: stderr,
+                        message: 'Failed to generate empty ground plane file. Check server logs.',
                         timestamp: new Date().toISOString()
                     });
                 }
@@ -1429,9 +1438,7 @@ app.post('/api/matlab/generate-gnd-import', async (req, res) => {
                     
                     return res.status(500).json({
                         success: false,
-                        message: 'Failed to generate F_GND_Import.m',
-                        error: error.message,
-                        stderr: stderr,
+                        message: 'Ground plane generation failed. Check server logs.',
                         timestamp: new Date().toISOString()
                     });
                 }
