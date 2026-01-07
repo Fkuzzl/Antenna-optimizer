@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AntennaVariableSelector from './AntennaVariableSelector';
 import SimulationResultsViewer from './SimulationResultsViewer';
-import AppConfig, { validateConfig } from './app_config';
+import AppConfig, { validateConfig, PathUtils, showAlert } from './app_config';
 
 export default function MatlabProjectRunner({ onBack }) {
   const [filePath, setFilePath] = useState('');
@@ -225,6 +225,18 @@ export default function MatlabProjectRunner({ onBack }) {
         console.error('   4. Mobile device on same network as server');
         setWsStatus('Disconnected');
         setServerStatus('Max Retries Reached');
+        
+        // Alert user about connection failure
+        showAlert(
+          'Connection Failed',
+          `Unable to connect to server after 10 attempts.\n\n` +
+          `Please check:\n` +
+          `• Server is running (npm run server)\n` +
+          `• Server IP is correct: ${MATLAB_SERVER_URL}\n` +
+          `• Firewall allows port 3001\n` +
+          `• Device on same network as server`,
+          [{ text: 'OK' }]
+        );
       }
     }
   };
@@ -264,18 +276,32 @@ export default function MatlabProjectRunner({ onBack }) {
 
   // Disconnect WebSocket
   const disconnectWebSocket = () => {
+    // Clear any pending reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
     
+    // Force close WebSocket connection
     if (wsRef.current) {
-      wsRef.current.close();
+      // Prevent reconnect on close
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      
+      // Close connection
+      if (wsRef.current.readyState === WebSocket.OPEN || 
+          wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
       wsRef.current = null;
     }
     
     setWsConnected(false);
     setWsStatus('Disconnected');
     setServerStatus('Disconnected');
+    console.log('🧹 WebSocket cleanup complete');
   };
 
   // Network diagnostics helper
@@ -695,9 +721,9 @@ export default function MatlabProjectRunner({ onBack }) {
     }
   };
 
-  // Helper function to get project directory from file path
+  // Helper function to get project directory from file path - using PathUtils
   const getProjectDirectory = (filePath) => {
-    return filePath.replace(/\\[^\\]*\.mlx?$/, '');
+    return PathUtils.getProjectRoot(filePath);
   };
 
   // Helper function to calculate running time duration
@@ -780,6 +806,16 @@ export default function MatlabProjectRunner({ onBack }) {
         return; // Skip if same iteration was already processed recently
       }
 
+      // Update timestamp BEFORE making request to prevent race condition
+      setLastLoggedData(prev => ({
+        ...prev,
+        lastExcelUpdate: {
+          projectDir,
+          iteration: iteration || -1,
+          timestamp: Date.now()
+        }
+      }));
+
       const response = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -793,16 +829,6 @@ export default function MatlabProjectRunner({ onBack }) {
       if (result.success) {
         // Minimal logging - just show iteration number
         console.log(`📊 Results updated (iteration ${iteration || 'current'})`);
-        
-        // Update throttle tracking
-        setLastLoggedData(prev => ({
-          ...prev,
-          lastExcelUpdate: {
-            projectDir,
-            iteration: iteration || -1,
-            timestamp: Date.now()
-          }
-        }));
       } else {
         console.log('⚠️ Results update failed:', result.message);
       }
@@ -971,10 +997,11 @@ export default function MatlabProjectRunner({ onBack }) {
 
   // Separate effect for fallback polling only (NOT for initial connection)
   useEffect(() => {
-    // Fallback polling when WebSocket disconnected (limited fallback)
+    // Fallback polling when WebSocket disconnected - only trigger ONCE at threshold
+    // This prevents effect from running on EVERY reconnect attempt
     let fallbackInterval = null;
-    if (!wsConnected && wsReconnectCount > 5) {
-      console.log('🔄 WebSocket failed, falling back to basic server checks');
+    if (!wsConnected && wsReconnectCount === 6) { // Trigger only when hitting threshold
+      console.log('🔄 WebSocket failed after 6 attempts, starting fallback server checks');
       fallbackInterval = setInterval(() => {
         // Only check basic server connectivity as fallback
         checkServerStatus();
@@ -982,7 +1009,10 @@ export default function MatlabProjectRunner({ onBack }) {
     }
     
     return () => {
-      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (fallbackInterval) {
+        console.log('🧹 Clearing fallback interval');
+        clearInterval(fallbackInterval);
+      }
     };
   }, [wsConnected, wsReconnectCount]);
 
