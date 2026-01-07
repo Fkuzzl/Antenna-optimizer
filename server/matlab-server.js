@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const XLSX = require('xlsx');
 const WebSocket = require('ws');
@@ -379,7 +380,7 @@ async function getMatlabProcesses() {
 }
 
 // API endpoint to get variable definitions from external configuration
-app.get('/api/variables', (req, res) => {
+app.get('/api/variables', async (req, res) => {
   try {
     const configPath = path.join(__dirname, '..', 'config', 'antenna_variables.json');
     
@@ -391,7 +392,8 @@ app.get('/api/variables', (req, res) => {
       });
     }
     
-    const configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const configContent = await fsPromises.readFile(configPath, 'utf-8');
+    const configData = JSON.parse(configContent);
     
     console.log(`✅ Loaded ${configData.variables.length} variables from configuration`);
     
@@ -1313,8 +1315,8 @@ app.post('/api/matlab/update-ground-plane', moderateRateLimiter, async (req, res
         console.log(`✅ File found, proceeding with update...`);
 
         try {
-            // Read the current F_Model_Element.m file
-            let fModelContent = fs.readFileSync(fModelPath, 'utf-8');
+            // Read the current F_Model_Element.m file (async)
+            let fModelContent = await fsPromises.readFile(fModelPath, 'utf-8');
             console.log(`📖 Read F_Model_Element.m (${fModelContent.length} characters)`);
             
             // Extract current values for comparison
@@ -1409,8 +1411,8 @@ hfssChangeVar(fid,'GND_yPos',GND_yPos,'mm');
                 }
             }
 
-            // Write the updated content back to the file
-            fs.writeFileSync(fModelPath, fModelContent, 'utf-8');
+            // Write the updated content back to the file (async)
+            await fsPromises.writeFile(fModelPath, fModelContent, 'utf-8');
             console.log(`💾 Successfully updated F_Model_Element.m`);
 
             res.json({
