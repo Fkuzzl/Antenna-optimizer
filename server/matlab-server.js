@@ -18,6 +18,38 @@ const uuidv4 = () => {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
 };
 
+/**
+ * Sanitizes error messages to prevent exposure of internal system details.
+ * Removes file paths, stack traces, and sensitive system information.
+ * @param {Error|string} error - The error object or message to sanitize
+ * @returns {string} - Sanitized error message safe for client consumption
+ */
+const sanitizeError = (error) => {
+    const message = typeof error === 'string' ? error : (error.message || 'Unknown error');
+    
+    // Remove file paths (Windows and Unix)
+    let sanitized = message.replace(/[A-Za-z]:\\[\w\\\-\. ]+/g, '[path]');
+    sanitized = sanitized.replace(/\/[\w\/\-\. ]+/g, '[path]');
+    
+    // Remove Python stack traces
+    sanitized = sanitized.replace(/File ".*?", line \d+.*/g, '');
+    sanitized = sanitized.replace(/Traceback \(most recent call last\):.*/s, '');
+    
+    // Remove node module paths
+    sanitized = sanitized.replace(/node_modules[\\/][\w\\/\-\.]+/g, '[module]');
+    
+    // Trim excessive whitespace
+    sanitized = sanitized.replace(/\s+/g, ' ').trim();
+    
+    // If the sanitized message is too generic, provide a helpful fallback
+    if (sanitized === '' || sanitized === '[path]') {
+        return 'An error occurred during processing';
+    }
+    
+    return sanitized;
+};
+
+
 // Load centralized configuration
 const setupConfig = require('../OPEN_THIS/SETUP/setup_loader.js');
 
@@ -307,7 +339,7 @@ app.get('/api/variables', (req, res) => {
     console.log(`   💬 Error message: ${error.message}`);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: sanitizeError(error)
     });
   }
 });
@@ -338,7 +370,7 @@ app.get('/api/matlab/check', (req, res) => {
     console.log(`   💬 Error message: ${error.message}`);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: sanitizeError(error)
     });
   }
 });
