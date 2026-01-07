@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Dimensions } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
-import AppConfig, { PathUtils } from './app_config';
+import AppConfig, { PathUtils, showAlert } from './app_config';
 
 export default function SimulationResultsViewer({ onBack, projectPath = null }) {
   const [simulationResults, setSimulationResults] = useState({
@@ -31,7 +31,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       const projectDir = getProjectDirectory();
       
       if (!projectDir) {
-        Alert.alert('Error', 'Project path not available. Please ensure a project is selected.');
+        showAlert('Error', 'Project path not available. Please ensure a project is selected.');
         setIsLoading(false);
         return;
       }
@@ -82,7 +82,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       
       if (result.success) {
         setSimulationResults(result.data);
-        Alert.alert('Success', `Latest results loaded successfully!\n\n📊 ${result.data.iterations.length} iterations found\n🎯 Auto-updated from CSV files`);
+        showAlert('Success', `Latest results loaded successfully!\n\n📊 ${result.data.iterations.length} iterations found\n🎯 Auto-updated from CSV files`);
       } else {
         // Fallback to old method if integrated Excel not available
         await loadResultsFromManualPath();
@@ -90,10 +90,10 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
     } catch (error) {
       if (error.name === 'AbortError') {
         console.log('⏱️ Results loading timed out - server may be busy');
-        Alert.alert('Timeout', 'Loading results timed out. Server may be busy. Please try again.');
+        showAlert('Timeout', 'Loading results timed out. Server may be busy. Please try again.');
       } else {
         console.error('Error loading integrated results:', error);
-        Alert.alert('Connection Error', 'Could not connect to server to load results.');
+        showAlert('Connection Error', 'Could not connect to server to load results.');
       }
     } finally {
       setIsLoading(false);
@@ -121,13 +121,13 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       
       if (result.success) {
         setSimulationResults(result.data);
-        Alert.alert('Success', 'Simulation results loaded successfully from manual path!');
+        showAlert('Success', 'Simulation results loaded successfully from manual path!');
       } else {
-        Alert.alert('Error', result.message || 'No simulation data found. Try creating the integrated Excel cache first.');
+        showAlert('Error', result.message || 'No simulation data found. Try creating the integrated Excel cache first.');
       }
     } catch (error) {
       console.error('Error loading manual path results:', error);
-      Alert.alert('No Data Found', 'No integrated Excel file or manual CSV files found.\n\nTo use this feature:\n1. Run MATLAB optimization to generate CSV files\n2. The system will automatically create an integrated Excel cache');
+      showAlert('No Data Found', 'No integrated Excel file or manual CSV files found.\n\nTo use this feature:\n1. Run MATLAB optimization to generate CSV files\n2. The system will automatically create an integrated Excel cache');
     }
   };
 
@@ -138,7 +138,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       const projectDir = getProjectDirectory();
       
       if (!projectDir) {
-        Alert.alert('Error', 'Project path not available. Please ensure a project is selected.');
+        showAlert('Error', 'Project path not available. Please ensure a project is selected.');
         setIsLoading(false);
         return;
       }
@@ -165,7 +165,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       
     } catch (error) {
       console.error('❌ Error refreshing results:', error);
-      Alert.alert(
+      showAlert(
         'Refresh Failed',
         `Could not refresh simulation results: ${error.message}`
       );
