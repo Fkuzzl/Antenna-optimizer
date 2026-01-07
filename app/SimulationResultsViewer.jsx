@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform, Dimensions } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
-import AppConfig from './app_config';
+import AppConfig, { PathUtils } from './app_config';
 
 export default function SimulationResultsViewer({ onBack, projectPath = null }) {
   const [simulationResults, setSimulationResults] = useState({
@@ -18,10 +18,10 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
   // Server configuration - load from centralized config
   const MATLAB_SERVER_URL = AppConfig.serverUrl;
 
-  // Get project directory from projectPath
+  // Get project directory from projectPath using PathUtils
   const getProjectDirectory = () => {
     if (!projectPath) return null;
-    return projectPath.replace(/\\[^\\]*\.mlx?$/, '');
+    return PathUtils.getProjectRoot(projectPath);
   };
 
   const loadSimulationResults = async () => {

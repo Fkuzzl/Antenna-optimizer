@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch, Dimensions, Platform, Image, TextInput, Keyboard } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import GroundPlaneConfigurator from './GroundPlaneConfigurator';
-import AppConfig from './app_config';
+import AppConfig, { PathUtils } from './app_config';
 
 const { width } = Dimensions.get('window');
 
@@ -160,15 +160,8 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
     setIsCheckingPath(true);
     
     try {
-      // Extract project root from project path - handle both Windows and Unix paths
-      let projectRoot;
-      if (projectPath.includes('\\')) {
-        // Windows path
-        projectRoot = projectPath.substring(0, projectPath.lastIndexOf('\\'));
-      } else {
-        // Unix/Linux path
-        projectRoot = projectPath.substring(0, projectPath.lastIndexOf('/'));
-      }
+      // Extract project root from project path using PathUtils
+      const projectRoot = PathUtils.getProjectRoot(projectPath);
       
       // Construct the expected path using proper separators
       const expectedPath = projectPath.includes('\\') 
@@ -257,15 +250,8 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
       const silentCheck = async () => {
         setIsCheckingPath(true);
         try {
-          // Extract project root from project path - handle both Windows and Unix paths
-          let projectRoot;
-          if (projectPath.includes('\\')) {
-            // Windows path
-            projectRoot = projectPath.substring(0, projectPath.lastIndexOf('\\'));
-          } else {
-            // Unix/Linux path
-            projectRoot = projectPath.substring(0, projectPath.lastIndexOf('/'));
-          }
+          // Extract project root from project path using PathUtils
+          const projectRoot = PathUtils.getProjectRoot(projectPath);
           
           // Construct the expected path using proper separators
           const expectedPath = projectPath.includes('\\') 
@@ -583,9 +569,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         setTimeout(() => {
           const silentRecheck = async () => {
             try {
-              const projectRoot = projectPath.includes('\\') 
-                ? projectPath.substring(0, projectPath.lastIndexOf('\\'))
-                : projectPath.substring(0, projectPath.lastIndexOf('/'));
+              const projectRoot = PathUtils.getProjectRoot(projectPath);
               
               const expectedPath = `${projectRoot}\\Function\\HFSS\\F_Model_Element.m`;
               
