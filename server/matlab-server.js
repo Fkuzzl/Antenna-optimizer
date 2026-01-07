@@ -49,6 +49,48 @@ const sanitizeError = (error) => {
     return sanitized;
 };
 
+/**
+ * Validates and sanitizes file paths to prevent path traversal attacks.
+ * Ensures paths don't contain dangerous patterns like ../ or absolute paths to system directories.
+ * @param {string} filePath - The file path to validate
+ * @param {string} expectedBase - Optional expected base directory path
+ * @returns {{valid: boolean, sanitized: string, error: string}} - Validation result
+ */
+const validatePath = (filePath, expectedBase = null) => {
+    if (!filePath || typeof filePath !== 'string') {
+        return { valid: false, sanitized: '', error: 'Path must be a non-empty string' };
+    }
+    
+    // Normalize the path to resolve . and .. segments
+    const normalized = path.normalize(filePath);
+    
+    // Check for path traversal attempts
+    if (normalized.includes('..')) {
+        return { valid: false, sanitized: '', error: 'Path traversal detected' };
+    }
+    
+    // Prevent access to sensitive system directories
+    const dangerous = ['windows', 'system32', 'program files', '/etc', '/usr', '/bin', '/sys', '/proc'];
+    const lowerPath = normalized.toLowerCase();
+    for (const dir of dangerous) {
+        if (lowerPath.includes(dir)) {
+            return { valid: false, sanitized: '', error: 'Access to system directories not allowed' };
+        }
+    }
+    
+    // If expected base provided, ensure path starts with it
+    if (expectedBase) {
+        const normalizedBase = path.normalize(expectedBase);
+        const resolved = path.resolve(normalized);
+        const resolvedBase = path.resolve(normalizedBase);
+        
+        if (!resolved.startsWith(resolvedBase)) {
+            return { valid: false, sanitized: '', error: 'Path outside expected directory' };
+        }
+    }
+    
+    return { valid: true, sanitized: normalized, error: '' };
+};
 
 // Load centralized configuration
 const setupConfig = require('../OPEN_THIS/SETUP/setup_loader.js');
@@ -1009,6 +1051,17 @@ app.post('/api/matlab/apply-variables', (req, res) => {
                 message: 'projectPath string is required'
             });
         }
+        
+        // Validate and sanitize projectPath to prevent path traversal
+        const pathValidation = validatePath(projectPath);
+        if (!pathValidation.valid) {
+            console.log(`❌ Security: Path validation failed - ${pathValidation.error}`);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid project path',
+                error: pathValidation.error
+            });
+        }
 
         if (variableIds.length === 0) {
             console.log('❌ Error: No variable IDs provided');
@@ -1119,6 +1172,17 @@ app.post('/api/matlab/update-ground-plane', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'projectPath string is required'
+            });
+        }
+        
+        // Validate and sanitize projectPath to prevent path traversal
+        const pathValidation = validatePath(projectPath);
+        if (!pathValidation.valid) {
+            console.log(`❌ Security: Path validation failed - ${pathValidation.error}`);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid project path',
+                error: pathValidation.error
             });
         }
 
@@ -1376,6 +1440,17 @@ app.post('/api/matlab/generate-gnd-import', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'projectPath string is required'
+            });
+        }
+        
+        // Validate and sanitize projectPath to prevent path traversal
+        const pathValidation = validatePath(projectPath);
+        if (!pathValidation.valid) {
+            console.log(`❌ Security: Path validation failed - ${pathValidation.error}`);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid project path',
+                error: pathValidation.error
             });
         }
 
