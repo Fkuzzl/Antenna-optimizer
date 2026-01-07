@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Dimensions, Platform, Alert, Keyboard, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Dimensions, Platform, Keyboard, ActivityIndicator, ScrollView } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
-import AppConfig from './app_config';
+import AppConfig, { showAlert } from './app_config';
 
 const { width } = Dimensions.get('window');
 
@@ -563,21 +563,13 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
     
     if (isNaN(lgxValue) || lgxValue < ANTENNA_SIZE) {
       const message = `Ground plane X dimension must be at least ${ANTENNA_SIZE}mm (antenna size)`;
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert('Invalid Size', message);
-      }
+      showAlert('Invalid Size', message);
       return;
     }
     
     if (isNaN(lgyValue) || lgyValue < ANTENNA_SIZE) {
       const message = `Ground plane Y dimension must be at least ${ANTENNA_SIZE}mm (antenna size)`;
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert('Invalid Size', message);
-      }
+      showAlert('Invalid Size', message);
       return;
     }
     
@@ -637,7 +629,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
       
       // Validate DXF file extension
       if (!file.name.toLowerCase().endsWith('.dxf')) {
-        window.alert('Invalid File Format\n\nPlease select a DXF file. Other formats (STL, VBS) are not supported.');
+        showAlert('Invalid File Format', 'Please select a DXF file. Other formats (STL, VBS) are not supported.');
         // Reset file input
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -700,8 +692,8 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
         // Check validation errors (e.g., size too small)
         if (data.validation && data.validation.errors && data.validation.errors.length > 0) {
           const errorMessages = data.validation.errors.join('\n');
-          window.alert(
-            '❌ Invalid Ground Plane Design\n\n' +
+          showAlert(
+            '❌ Invalid Ground Plane Design',
             errorMessages + '\n\n' +
             'The antenna is 25mm × 25mm and must fit entirely within the ground plane. ' +
             'Please redesign your DXF file with larger dimensions.'
@@ -747,7 +739,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
           `Review the geometry info below, then tap "Next" to position your antenna.`;
         
         console.log('📢 Showing alert:', alertMessage);
-        window.alert(alertMessage);
+        showAlert('✅ GND Imported', alertMessage);
       } else {
         throw new Error(data.error || 'Upload failed with unknown error');
       }
@@ -757,8 +749,8 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
       console.error('   Error stack:', error.stack);
       
       const errorMessage = error.message || 'Unknown error occurred';
-      window.alert(
-        'Upload Failed\n\n' +
+      showAlert(
+        'Upload Failed',
         errorMessage + '\n\n' +
         'Troubleshooting:\n' +
         '• Check server is running (port 3001)\n' +
@@ -796,10 +788,9 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
       
       // Validate DXF file extension
       if (!file.name.toLowerCase().endsWith('.dxf')) {
-        Alert.alert(
+        showAlert(
           'Invalid File Format',
-          'Please select a DXF file. Other formats (STL, VBS) are not supported.',
-          [{ text: 'OK' }]
+          'Please select a DXF file. Other formats (STL, VBS) are not supported.'
         );
         return;
       }
@@ -863,12 +854,11 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
         // Check validation errors (e.g., size too small)
         if (data.validation && data.validation.errors && data.validation.errors.length > 0) {
           const errorMessages = data.validation.errors.join('\n');
-          Alert.alert(
+          showAlert(
             '❌ Invalid Ground Plane Design',
             errorMessages + '\n\n' +
             'The antenna is 25mm × 25mm and must fit entirely within the ground plane. ' +
-            'Please redesign your DXF file with larger dimensions.',
-            [{ text: 'OK' }]
+            'Please redesign your DXF file with larger dimensions.'
           );
           setIsUploading(false);
           return;
@@ -907,7 +897,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
           `Review the geometry info below, then tap "Next" to position your antenna.`;
         
         console.log('📢 Showing alert:', alertMessage);
-        Alert.alert('✅ GND Imported', alertMessage, [{ text: 'OK' }]);
+        showAlert('✅ GND Imported', alertMessage);
       } else {
         throw new Error(data.error || 'Upload failed with unknown error');
       }
@@ -917,7 +907,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
       console.error('   Error stack:', error.stack);
       
       const errorMessage = error.message || 'Unknown error occurred';
-      Alert.alert(
+      showAlert(
         'Upload Failed', 
         `Could not upload DXF file.\n\n` +
         `Error: ${errorMessage}\n\n` +
@@ -925,8 +915,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
         `• Check that server is running (npm run server)\n` +
         `• Verify file format (DXF only)\n` +
         `• Check file size (<50MB)\n` +
-        `• Look at console for detailed logs`,
-        [{ text: 'OK' }]
+        `• Look at console for detailed logs`
       );
     } finally {
       setIsUploading(false);
@@ -946,7 +935,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
   
   const validateGND = async () => {
     if (!gndData || !gndData.gndId) {
-      Alert.alert('Error', 'No GND file uploaded');
+      showAlert('Error', 'No GND file uploaded');
       return;
     }
 
@@ -978,7 +967,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
               message += 'Suggestions:\n' + validationData.suggestions.join('\n');
             }
             
-            Alert.alert('Validation Result', message);
+            showAlert('Validation Result', message);
             return;
           }
         } catch (err) {
@@ -990,7 +979,7 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
 
     } catch (error) {
       console.error('❌ Validation error:', error);
-      Alert.alert('Validation Failed', error.message);
+      showAlert('Validation Failed', error.message);
     } finally {
       setIsUploading(false);
     }
