@@ -7,6 +7,7 @@ const XLSX = require('xlsx');
 const WebSocket = require('ws');
 const http = require('http');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 
 // Provide a safe uuidv4 helper (uses crypto.randomUUID when available)
 const crypto = require('crypto');
@@ -152,6 +153,31 @@ app.use((req, res, next) => {
   }
   
   next();
+});
+
+// Rate limiting for sensitive endpoints
+const strictRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit each IP to 50 requests per windowMs
+  message: 'Too many requests from this IP, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const moderateRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // Limit each IP to 30 requests per minute
+  message: 'Too many requests, please slow down',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const uploadRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10, // Limit uploads to 10 per 10 minutes
+  message: 'Too many file uploads, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Track current MATLAB execution
@@ -515,7 +541,7 @@ app.post('/api/matlab/check-file', (req, res) => {
 });
 
 // API endpoint to run MATLAB Live Script with visible GUI
-app.post('/api/matlab/run', async (req, res) => {
+app.post('/api/matlab/run', strictRateLimiter, async (req, res) => {
     try {
         const { filePath } = req.body;
         
@@ -1032,7 +1058,7 @@ app.get('/api/matlab/iteration-count', (req, res) => {
 });
 
 // Simplified endpoint to apply variable changes using Python script
-app.post('/api/matlab/apply-variables', (req, res) => {
+app.post('/api/matlab/apply-variables', moderateRateLimiter, (req, res) => {
     try {
         const { variableIds, projectPath } = req.body;
         
@@ -1147,7 +1173,7 @@ app.post('/api/matlab/apply-variables', (req, res) => {
 
 
 // API endpoint for updating ground plane parameters
-app.post('/api/matlab/update-ground-plane', async (req, res) => {
+app.post('/api/matlab/update-ground-plane', moderateRateLimiter, async (req, res) => {
     try {
         console.log('🔧 ===== UPDATE GROUND PLANE REQUEST =====');
         console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
@@ -1430,7 +1456,7 @@ hfssChangeVar(fid,'GND_yPos',GND_yPos,'mm');
 });
 
 // API endpoint to generate F_GND_Import.m for custom DXF ground plane
-app.post('/api/matlab/generate-gnd-import', async (req, res) => {
+app.post('/api/matlab/generate-gnd-import', moderateRateLimiter, async (req, res) => {
     try {
         const { dxfPath, gndXPos, gndYPos, projectPath, mode } = req.body;
 
@@ -2868,7 +2894,7 @@ const gndUpload = multer({
  * POST /api/gnd/upload
  * Upload and parse custom GND geometry file
  */
-app.post('/api/gnd/upload', gndUpload.single('gndFile'), async (req, res) => {
+app.post('/api/gnd/upload', uploadRateLimiter, gndUpload.single('gndFile'), async (req, res) => {
   try {
     const { projectPath } = req.body;
     const file = req.file;
