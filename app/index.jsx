@@ -213,321 +213,71 @@ const HomePage = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    ...(Platform.OS === 'web' && {
-      height: '100vh',
-      maxHeight: '100vh',
-      overflow: 'hidden',
-    }),
-  },
-  
-  // Enhanced Header Styles
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  headerIconImage: {
-    width: 50,
-    height: 50,
-    marginBottom: 15,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  appSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontWeight: '500',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-    marginRight: 6,
-  },
-  statusIcon: {
-    fontSize: 12,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  
-  // Scroll Wrapper for web compatibility
-  scrollWrapper: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-      position: 'relative',
-    }),
-  },
-  
-  // Content Styles
-  content: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'scroll',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      height: '100%',
-    }),
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  
-  // Spacer
-  spacer: {
-    height: 40,
-  },
-  
-  // Hero Section
-  heroSection: {
-    marginTop: -20,
-    marginBottom: 20,
-  },
-  heroCard: {
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  heroIcon: {
-    marginBottom: 15,
-  },
-  heroIconGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  heroIconText: {
-    fontSize: 24,
-    color: '#ffffff',
-  },
-  welcomeDescription: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  
-  // Primary Action Card
-  actionSection: {
-    marginBottom: 20,
-  },
-  primaryCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  primaryCardGradient: {
-    padding: 28,
-  },
-  primaryCardContent: {
-    gap: 16,
-  },
-  primaryCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  primaryCardIcon: {
-    width: 50,
-    height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  primaryCardIconText: {
-    fontSize: 20,
-    color: '#ffffff',
-  },
-  primaryCardIconImage: {
-    width: 30,
-    height: 30,
-  },
-  primaryCardTexts: {
-    flex: 1,
-  },
-  primaryCardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  primaryCardSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
-  },
-  primaryCardArrow: {
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryCardArrowText: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  primaryCardFeatures: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  primaryCardFeature: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  
-  // Secondary Section
-  secondarySection: {
-    marginBottom: 25,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  secondaryGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  secondaryCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  secondaryCardGradient: {
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  secondaryCardIcon: {
-    marginBottom: 12,
-  },
-  secondaryIconGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryCardIconText: {
-    fontSize: 18,
-    color: '#ffffff',
-  },
-  secondaryCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  secondaryCardDescription: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  
-  // Stats Section
-  statsSection: {
-    marginBottom: 20,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  statCardGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+  // Main Container - Root layout with full height and background color
+  container: { flex: 1, backgroundColor: '#f1f5f9', ...(Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }) },
+
+  // Header Section - Blue gradient header with app icon, title, subtitle and status indicators
+  header: { paddingTop: 60, paddingBottom: 30, paddingHorizontal: 20 },
+  headerContent: { alignItems: 'center' },
+  headerIconImage: { width: 50, height: 50, marginBottom: 15 },
+  appTitle: { fontSize: 32, fontWeight: '800', color: '#ffffff', textAlign: 'center', marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  appSubtitle: { fontSize: 16, color: 'rgba(255, 255, 255, 0.9)', textAlign: 'center', marginBottom: 20, fontWeight: '500' },
+  statusRow: { flexDirection: 'row', gap: 20 },
+  statusItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981', marginRight: 6 },
+  statusIcon: { fontSize: 12, marginRight: 6 },
+  statusText: { fontSize: 12, color: '#ffffff', fontWeight: '600' },
+
+  // Scroll Container - Wrapper for scrollable content area with web overflow handling
+  scrollWrapper: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'hidden', position: 'relative' }) },
+  content: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'scroll', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', height: '100%' }) },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  spacer: { height: 40 },
+
+  // Hero Section - Welcome card with icon and description text
+  heroSection: { marginTop: -20, marginBottom: 20 },
+  heroCard: { borderRadius: 16, padding: 20, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6 },
+  heroIcon: { marginBottom: 15 },
+  heroIconGradient: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  heroIconText: { fontSize: 24, color: '#ffffff' },
+  welcomeDescription: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 20 },
+
+  // Primary Action Card - Main MATLAB runner card with gradient, icon, features
+  actionSection: { marginBottom: 20 },
+  primaryCard: { borderRadius: 20, overflow: 'hidden', shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 12 },
+  primaryCardGradient: { padding: 28 },
+  primaryCardContent: { gap: 16 },
+  primaryCardHeader: { flexDirection: 'row', alignItems: 'center' },
+  primaryCardIcon: { width: 50, height: 50, backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  primaryCardIconText: { fontSize: 20, color: '#ffffff' },
+  primaryCardIconImage: { width: 30, height: 30 },
+  primaryCardTexts: { flex: 1 },
+  primaryCardTitle: { fontSize: 20, fontWeight: '700', color: '#ffffff', marginBottom: 4 },
+  primaryCardSubtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '500' },
+  primaryCardArrow: { width: 32, height: 32, backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  primaryCardArrowText: { fontSize: 16, color: '#ffffff', fontWeight: 'bold' },
+  primaryCardFeatures: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.2)' },
+  primaryCardFeature: { fontSize: 12, color: 'rgba(255, 255, 255, 0.9)', fontWeight: '500' },
+
+  // Secondary Cards - Settings and About cards with icons and descriptions
+  secondarySection: { marginBottom: 25 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1e293b', marginBottom: 16, paddingHorizontal: 4 },
+  secondaryGrid: { flexDirection: 'row', gap: 12 },
+  secondaryCard: { flex: 1, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6 },
+  secondaryCardGradient: { padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  secondaryCardIcon: { marginBottom: 12 },
+  secondaryIconGradient: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  secondaryCardIconText: { fontSize: 18, color: '#ffffff' },
+  secondaryCardTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b', textAlign: 'center', marginBottom: 6 },
+  secondaryCardDescription: { fontSize: 12, color: '#64748b', textAlign: 'center', lineHeight: 16 },
+
+  // Stats Section - System statistics with gradient backgrounds
+  statsSection: { marginBottom: 20 },
+  statsGrid: { flexDirection: 'row', gap: 12 },
+  statCard: { flex: 1, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  statCardGradient: { paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center' },
+  statNumber: { fontSize: 20, fontWeight: '700', color: '#ffffff', marginBottom: 4 },
+  statLabel: { fontSize: 11, color: 'rgba(255, 255, 255, 0.9)', fontWeight: '500', textAlign: 'center' },
 });
 
 export default HomePage;
