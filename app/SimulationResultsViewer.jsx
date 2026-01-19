@@ -284,7 +284,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
           {simulationResults.iterations.length > 0 && (
             <View style={styles.iterationStatus}>
               <Text style={styles.iterationStatusText}>
-                Page {currentPage} of {totalPages} • Total: {simulationResults.summary.totalIterations} iterations
+                Page {currentPage || 1} of {totalPages || 1} • Total: {simulationResults.summary.totalIterations || 0} iterations
               </Text>
               {elapsedMinutes > 0 && (
                 <Text style={styles.timerText}>
@@ -308,21 +308,31 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         {simulationResults.iterations.length > 0 && (
           <View style={styles.paginationContainer}>
             <TouchableOpacity 
-              onPress={() => loadPage(currentPage - 1)} 
-              style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-              disabled={currentPage === 1 || isLoading}
+              onPress={() => {
+                if (currentPage > 1 && !isLoading) {
+                  loadPage(currentPage - 1);
+                }
+              }} 
+              style={[styles.pageButton, (currentPage <= 1 || isLoading) && styles.pageButtonDisabled]}
+              disabled={currentPage <= 1 || isLoading}
+              activeOpacity={currentPage <= 1 || isLoading ? 1 : 0.7}
             >
-              <Text style={styles.pageButtonText}>← Previous</Text>
+              <Text style={[styles.pageButtonText, (currentPage <= 1 || isLoading) && styles.pageButtonTextDisabled]}>← Previous</Text>
             </TouchableOpacity>
             
-            <Text style={styles.pageInfo}>Page {currentPage} / {totalPages}</Text>
+            <Text style={styles.pageInfo}>Page {currentPage || 1} / {totalPages || 1}</Text>
             
             <TouchableOpacity 
-              onPress={() => loadPage(currentPage + 1)} 
-              style={[styles.pageButton, !hasMore && styles.pageButtonDisabled]}
-              disabled={!hasMore || isLoading}
+              onPress={() => {
+                if (currentPage < totalPages && hasMore && !isLoading) {
+                  loadPage(currentPage + 1);
+                }
+              }} 
+              style={[styles.pageButton, (currentPage >= totalPages || !hasMore || isLoading) && styles.pageButtonDisabled]}
+              disabled={currentPage >= totalPages || !hasMore || isLoading}
+              activeOpacity={currentPage >= totalPages || !hasMore || isLoading ? 1 : 0.7}
             >
-              <Text style={styles.pageButtonText}>Next →</Text>
+              <Text style={[styles.pageButtonText, (currentPage >= totalPages || !hasMore || isLoading) && styles.pageButtonTextDisabled]}>Next →</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -394,6 +404,7 @@ const styles = StyleSheet.create({
   pageButton: { backgroundColor: '#3b82f6', padding: 12, borderRadius: 8, minWidth: 100, alignItems: 'center' },
   pageButtonDisabled: { backgroundColor: '#cbd5e1' },
   pageButtonText: { color: 'white', fontWeight: '600' },
+  pageButtonTextDisabled: { color: '#94a3b8' },
   pageInfo: { fontSize: 14, fontWeight: 'bold', color: '#1f2937' },
   refreshLatestButton: { width: '100%', borderRadius: 10, overflow: 'hidden', marginBottom: 15 },
   refreshLatestGradient: { paddingVertical: 14, alignItems: 'center' },
