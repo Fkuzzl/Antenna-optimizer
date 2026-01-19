@@ -135,28 +135,28 @@ def update_excel_incremental(project_path):
     
     # Get current state
     last_excel_iter = get_last_iteration_in_excel(excel_path)
-    print(f"📊 Excel has iterations up to: {last_excel_iter}")
+    print(f"Excel has iterations up to: {last_excel_iter}")
     
     # Find missing iterations
     missing_iterations = find_csv_iterations(data_path, last_excel_iter)
     
     if not missing_iterations:
-        print("✅ Excel is up to date!")
+        print("Excel is up to date!")
         return True
     
-    print(f"🔄 Found {len(missing_iterations)} missing iterations: {missing_iterations[0]}-{missing_iterations[-1]}")
+    print(f"Found {len(missing_iterations)} missing iterations: {missing_iterations[0]}-{missing_iterations[-1]}")
     
     # Append each iteration
     for i, iteration in enumerate(missing_iterations, 1):
         try:
             print(f"   [{i}/{len(missing_iterations)}] Adding iteration {iteration}...", end=" ")
             append_iteration_to_excel(excel_path, data_path, iteration)
-            print("✅")
+            print("[OK]")
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] {e}")
             return False
     
-    print(f"🎉 Excel updated successfully! Now has {missing_iterations[-1]} iterations.")
+    print(f"Excel updated successfully! Now has {missing_iterations[-1]} iterations.")
     return True
 
 if __name__ == "__main__":
