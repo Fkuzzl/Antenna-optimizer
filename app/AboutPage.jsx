@@ -205,307 +205,66 @@ const AboutPage = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    ...(Platform.OS === 'web' && {
-      height: '100vh',
-      maxHeight: '100vh',
-      overflow: 'hidden',
-    }),
-  },
-  
-  // Enhanced Header Styles
-  header: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
-    alignItems: 'flex-start',
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  headerIcon: {
-    marginBottom: 15,
-  },
-  headerIconGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerIconText: {
-    fontSize: 24,
-    color: '#f59e0b',
-  },
-  headerIconImage: {
-    width: 36,
-    height: 36,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  headerVersionInfo: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-    marginTop: 15,
-  },
-  headerVersionText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
-  },
-  headerBuildText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '500',
-  },
-  
-  // Scroll Wrapper for web compatibility
-  scrollWrapper: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-      position: 'relative',
-    }),
-  },
-  
-  // Content Styles
-  scrollView: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'scroll',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      height: '100%',
-    }),
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  
-  // Header spacer
-  headerSpacer: {
-    height: 30,
-  },
-  
-  // Section Styles
-  section: {
-    marginBottom: 20,
-  },
-  sectionGradient: {
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  
-  // Info Row Styles
-  infoRow: {
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  linkText: {
-    color: '#3b82f6',
-    fontWeight: '500',
-  },
-  
-  // Feature Item Styles
-  featureItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  featureHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  featureIcon: {
-    fontSize: 16,
-    marginRight: 12,
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  featureDescription: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 18,
-    marginLeft: 28,
-  },
-  
-  // Format Item Styles
-  formatItem: {
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  formatIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  formatIconText: {
-    fontSize: 16,
-  },
-  formatDetails: {
-    flex: 1,
-  },
-  formatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3b82f6',
-    marginBottom: 2,
-  },
-  formatDescription: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 16,
-  },
-  
-  // Credits Styles
-  creditsList: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  creditItem: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  
-  // Footer Styles
-  footer: {
-    marginTop: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  footerGradient: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  footerSubtext: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
+  // Main Container - Root layout with full height and background color
+  container: { flex: 1, backgroundColor: '#f1f5f9', ...(Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }) },
+
+  // Header Section - Orange gradient header with back button, icon, title and version info
+  header: { paddingTop: 20, paddingBottom: 30, paddingHorizontal: 20 },
+  headerTop: { alignItems: 'flex-start', marginBottom: 15, marginTop: 10 },
+  backButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  backButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  headerContent: { alignItems: 'center' },
+  headerIcon: { marginBottom: 15 },
+  headerIconGradient: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  headerIconText: { fontSize: 24, color: '#f59e0b' },
+  headerIconImage: { width: 36, height: 36 },
+  title: { fontSize: 28, fontWeight: '800', color: '#ffffff', textAlign: 'center', marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  subtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.9)', textAlign: 'center', fontWeight: '500' },
+  headerVersionInfo: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 15 },
+  headerVersionText: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '600' },
+  headerBuildText: { fontSize: 12, color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' },
+
+  // Scroll Container - Wrapper for scrollable content area with web overflow handling
+  scrollWrapper: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'hidden', position: 'relative' }) },
+  scrollView: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'scroll', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', height: '100%' }) },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  headerSpacer: { height: 30 },
+
+  // Section Components - Gradient background containers for grouped content
+  section: { marginBottom: 20 },
+  sectionGradient: { borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1e293b', marginBottom: 16, paddingHorizontal: 4 },
+
+  // Info Row - Application details with label-value pairs and optional links
+  infoRow: { backgroundColor: '#ffffff', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  infoLabel: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  infoValue: { fontSize: 14, color: '#64748b' },
+  linkText: { color: '#3b82f6', fontWeight: '500' },
+
+  // Feature Items - Feature list with icons, titles and descriptions
+  featureItem: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#10b981', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 3 },
+  featureHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  featureIcon: { fontSize: 16, marginRight: 12 },
+  featureTitle: { fontSize: 15, fontWeight: '600', color: '#1e293b', flex: 1 },
+  featureDescription: { fontSize: 13, color: '#64748b', lineHeight: 18, marginLeft: 28 },
+
+  // Format Items - Supported file formats with icons and descriptions
+  formatItem: { backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  formatIcon: { width: 40, height: 40, backgroundColor: '#f1f5f9', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  formatIconText: { fontSize: 16 },
+  formatDetails: { flex: 1 },
+  formatName: { fontSize: 16, fontWeight: '600', color: '#3b82f6', marginBottom: 2 },
+  formatDescription: { fontSize: 13, color: '#64748b', lineHeight: 16 },
+
+  // Credits Section - List of libraries and acknowledgments
+  creditsList: { backgroundColor: '#ffffff', borderRadius: 12, padding: 20, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 3 },
+  creditItem: { fontSize: 14, color: '#374151', marginBottom: 8, lineHeight: 20 },
+
+  // Footer - Bottom gradient section with copyright and additional info
+  footer: { marginTop: 20, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  footerGradient: { padding: 24, alignItems: 'center' },
+  footerText: { fontSize: 14, color: '#ffffff', textAlign: 'center', marginBottom: 8, fontWeight: '500' },
+  footerSubtext: { fontSize: 12, color: 'rgba(255, 255, 255, 0.7)', textAlign: 'center', lineHeight: 16 },
 });
 
 export default AboutPage;
