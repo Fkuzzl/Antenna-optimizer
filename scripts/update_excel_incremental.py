@@ -86,36 +86,42 @@ def append_iteration_to_excel(excel_path, data_path, iteration):
         'Gain': {'pattern': f'Gain_{iteration}.csv', 'sheet': 'Gain_Data', 'col': 'Gain_dBi'}
     }
     
-    wb = load_workbook(excel_path)
-    
-    for data_type, config in data_configs.items():
-        csv_file = Path(data_path) / config['pattern']
+    wb = None
+    try:
+        wb = load_workbook(excel_path)
         
-        if not csv_file.exists():
-            continue
+        for data_type, config in data_configs.items():
+            csv_file = Path(data_path) / config['pattern']
+            
+            if not csv_file.exists():
+                continue
+            
+            df = read_csv_standardized(csv_file)
+            if df is None:
+                continue
+            
+            # Add iteration column
+            df['Iteration'] = iteration
+            df = df.rename(columns={'Value': config['col']})
+            df = df[['Iteration', 'Frequency_GHz', config['col']]]
+            
+            # Get or create sheet
+            if config['sheet'] not in wb.sheetnames:
+                ws = wb.create_sheet(config['sheet'])
+                ws.append(['Iteration', 'Frequency_GHz', config['col']])
+            else:
+                ws = wb[config['sheet']]
+            
+            # Append rows
+            for _, row in df.iterrows():
+                ws.append([row['Iteration'], row['Frequency_GHz'], row[config['col']]])
         
-        df = read_csv_standardized(csv_file)
-        if df is None:
-            continue
-        
-        # Add iteration column
-        df['Iteration'] = iteration
-        df = df.rename(columns={'Value': config['col']})
-        df = df[['Iteration', 'Frequency_GHz', config['col']]]
-        
-        # Get or create sheet
-        if config['sheet'] not in wb.sheetnames:
-            ws = wb.create_sheet(config['sheet'])
-            ws.append(['Iteration', 'Frequency_GHz', config['col']])
-        else:
-            ws = wb[config['sheet']]
-        
-        # Append rows
-        for _, row in df.iterrows():
-            ws.append([row['Iteration'], row['Frequency_GHz'], row[config['col']]])
-    
-    wb.save(excel_path)
-    wb.close()
+        wb.save(excel_path)
+    except Exception as e:
+        raise e
+    finally:
+        if wb:
+            wb.close()
 
 def update_excel_incremental(project_path):
     """Main update function - finds and appends all missing iterations."""

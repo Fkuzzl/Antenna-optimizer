@@ -110,6 +110,8 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
     const updated = await updateExcelFromCSV();
     
     if (updated) {
+      // Wait a moment for file to be fully written and closed
+      await new Promise(resolve => setTimeout(resolve, 1000));
       // Then load the latest page
       await loadPage('last');
     } else {

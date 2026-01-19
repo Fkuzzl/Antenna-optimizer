@@ -2344,6 +2344,30 @@ app.post('/api/integrated-results/read', async (req, res) => {
 });
 
 // Simple paginated API endpoint for loading results in chunks of 100
+// Helper function to safely read Excel file with retry
+const readExcelWithRetry = (filePath, maxRetries = 3, delayMs = 500) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const workbook = XLSX.readFile(filePath, { 
+                cellStyles: false,
+                cellFormula: false,
+                cellHTML: false
+            });
+            return workbook;
+        } catch (error) {
+            if (attempt === maxRetries) {
+                throw error;
+            }
+            console.log(`⚠️ Read attempt ${attempt} failed, retrying in ${delayMs}ms...`);
+            // Synchronous delay
+            const start = Date.now();
+            while (Date.now() - start < delayMs) {
+                // Wait
+            }
+        }
+    }
+};
+
 app.post('/api/integrated-results/read-page', async (req, res) => {
     try {
         const { projectPath, page = 1, pageSize = 100 } = req.body;
@@ -2366,7 +2390,19 @@ app.post('/api/integrated-results/read-page', async (req, res) => {
 
         console.log(`📖 Reading page ${page} (size: ${pageSize})`);
 
-        const workbook = XLSX.readFile(excelPath);
+        // Read with retry logic to handle file being written
+        let workbook;
+        try {
+            workbook = readExcelWithRetry(excelPath);
+        } catch (error) {
+            console.error('❌ Error reading Excel file:', error.message);
+            return res.status(500).json({
+                success: false,
+                message: 'Excel file is corrupted or being updated. Please try again in a moment.',
+                error: error.message
+            });
+        }
+
         const iterationData = {};
 
         // Read all sheets
