@@ -2440,6 +2440,37 @@ app.post('/api/integrated-results/read-page', async (req, res) => {
     }
 });
 
+// Update Excel with missing iterations
+app.post('/api/integrated-results/update', async (req, res) => {
+    try {
+        const { projectPath } = req.body;
+        
+        if (!projectPath || !fs.existsSync(projectPath)) {
+            return res.status(400).json({ success: false, message: 'Invalid project path' });
+        }
+
+        console.log(`🔄 Updating Excel for project: ${projectPath}`);
+
+        // Run Python script to update Excel
+        const scriptPath = path.join(__dirname, '..', 'scripts', 'update_excel_incremental.py');
+        const pythonCmd = `python "${scriptPath}" --project-path "${projectPath}"`;
+
+        exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('❌ Update error:', stderr);
+                return res.json({ success: false, message: 'Update failed', error: stderr });
+            }
+
+            console.log('✅ Update output:', stdout);
+            res.json({ success: true, message: 'Excel updated successfully', output: stdout });
+        });
+
+    } catch (error) {
+        console.error('❌ Update endpoint error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
     console.log(`\n📛 Received ${signal}, shutting down gracefully...`);

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import AppConfig, { PathUtils, showAlert } from './app_config';
 
@@ -12,16 +12,121 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showOutdatedModal, setShowOutdatedModal] = useState(false);
+  const [elapsedMinutes, setElapsedMinutes] = useState(0);
+  
+  const timerRef = useRef(null);
+  const loadTimeRef = useRef(null);
 
   const MATLAB_SERVER_URL = AppConfig.serverUrl;
+  const OUTDATED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+  // Timer management
+  useEffect(() => {
+    // Start timer when data is loaded
+    if (simulationResults.iterations.length > 0 && !showOutdatedModal) {
+      loadTimeRef.current = Date.now();
+      
+      // Clear any existing timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      timerRef.current = setInterval(() => {
+        const elapsed = Date.now() - loadTimeRef.current;
+        const minutes = Math.floor(elapsed / 60000);
+        setElapsedMinutes(minutes);
+        
+        if (elapsed >= OUTDATED_THRESHOLD_MS) {
+          setShowOutdatedModal(true);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+        }
+      }, 10000); // Check every 10 seconds
+      
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+      };
+    }
+  }, [simulationResults.iterations.length, showOutdatedModal]);
 
   const getProjectDirectory = () => {
     if (!projectPath) return null;
     return PathUtils.getProjectRoot(projectPath);
   };
 
-  const loadPage = async (page = 'last') => {
+  const resetTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedMinutes(0);
+    setShowOutdatedModal(false);
+    loadTimeRef.current = Date.now();
+  };
+
+  const updateExcelFromCSV = async () => {
+    try {
+      const projectDir = getProjectDirectory();
+      if (!projectDir) {
+        showAlert('Error', 'Project path not available.');
+        return false;
+      }
+
+      console.log('🔄 Updating Excel from CSV files...');
+      
+      const response = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath: projectDir })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Excel updated:', result.output);
+        return true;
+      } else {
+        console.error('❌ Update failed:', result.message);
+        showAlert('Update Failed', result.message || 'Could not update Excel file');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Update error:', error);
+      showAlert('Error', 'Could not connect to server for update');
+      return false;
+    }
+  };
+
+  const refreshLatestResults = async () => {
     setIsLoading(true);
+    resetTimer();
+    
+    // First update Excel from CSV
+    const updated = await updateExcelFromCSV();
+    
+    if (updated) {
+      // Then load the latest page
+      await loadPage('last');
+    } else {
+      // Even if update fails, try to load existing data
+      await loadPage('last');
+    }
+    
+    setIsLoading(false);
+  };
+
+  const loadPage = async (page = 'last') => {
+    // Don't reset timer if we're in loading state already
+    if (!isLoading) {
+      setIsLoading(true);
+      resetTimer(); // Reset timer on manual navigation
+    }
+    
     try {
       const projectDir = getProjectDirectory();
       if (!projectDir) {
@@ -110,6 +215,51 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
 
   return (
     <View style={styles.container}>
+      {/* Outdated Data Modal */}
+      <Modal
+        visible={showOutdatedModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <LinearGradient
+              colors={['#10b981', '#059669']}
+              style={styles.modalGradient}
+            >
+              <View style={styles.iconCircle}>
+                <Text style={styles.iconText}>🔄</Text>
+              </View>
+              <Text style={styles.modalTitle}>MATLAB Antenna Optimizer</Text>
+              <Text style={styles.modalSubtitle}>Data might be outdated...</Text>
+              
+              <View style={styles.loadingDots}>
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+              </View>
+
+              <TouchableOpacity
+                onPress={refreshLatestResults}
+                style={styles.refreshButton}
+                disabled={isLoading}
+              >
+                <Text style={styles.refreshButtonText}>
+                  {isLoading ? '⏳ Refreshing...' : '🔄 Refresh Latest Results'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowOutdatedModal(false)}
+                style={styles.dismissButton}
+              >
+                <Text style={styles.dismissButtonText}>Dismiss</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.fixedHeader}>
         <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -134,6 +284,11 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               <Text style={styles.iterationStatusText}>
                 Page {currentPage} of {totalPages} • Total: {simulationResults.summary.totalIterations} iterations
               </Text>
+              {elapsedMinutes > 0 && (
+                <Text style={styles.timerText}>
+                  ⏱️ Loaded {elapsedMinutes} min ago {elapsedMinutes >= 4 && '(refresh recommended)'}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -168,6 +323,15 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               <Text style={styles.pageButtonText}>Next →</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Refresh Latest Button */}
+        {simulationResults.iterations.length > 0 && (
+          <TouchableOpacity onPress={refreshLatestResults} style={styles.refreshLatestButton} disabled={isLoading}>
+            <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']} style={styles.refreshLatestGradient}>
+              <Text style={styles.refreshLatestText}>{isLoading ? '⏳ Refreshing...' : '🔄 Refresh Latest Results'}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         )}
 
         {/* Results */}
@@ -220,6 +384,7 @@ const styles = StyleSheet.create({
   pathInfo: { fontSize: 12, color: '#9ca3af', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   iterationStatus: { backgroundColor: '#f0f9ff', padding: 12, borderRadius: 8, marginTop: 10, borderLeftWidth: 3, borderLeftColor: '#0ea5e9' },
   iterationStatusText: { fontSize: 13, color: '#0c4a6e', fontWeight: '600' },
+  timerText: { fontSize: 11, color: '#075985', marginTop: 4, fontStyle: 'italic' },
   actionButton: { width: '100%', borderRadius: 10, overflow: 'hidden', marginBottom: 15 },
   actionButtonGradient: { paddingVertical: 14, alignItems: 'center' },
   actionButtonText: { color: 'white', fontSize: 15, fontWeight: '600' },
@@ -228,6 +393,9 @@ const styles = StyleSheet.create({
   pageButtonDisabled: { backgroundColor: '#cbd5e1' },
   pageButtonText: { color: 'white', fontWeight: '600' },
   pageInfo: { fontSize: 14, fontWeight: 'bold', color: '#1f2937' },
+  refreshLatestButton: { width: '100%', borderRadius: 10, overflow: 'hidden', marginBottom: 15 },
+  refreshLatestGradient: { paddingVertical: 14, alignItems: 'center' },
+  refreshLatestText: { color: 'white', fontSize: 15, fontWeight: '600' },
   resultsSection: { marginBottom: 20 },
   resultsSummaryHeader: { backgroundColor: 'white', padding: 16, borderRadius: 12, marginBottom: 15, elevation: 2 },
   resultsSectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 8 },
@@ -244,4 +412,18 @@ const styles = StyleSheet.create({
   noDataSection: { backgroundColor: 'white', padding: 30, borderRadius: 12, alignItems: 'center', elevation: 3 },
   noDataTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151', marginBottom: 10 },
   noDataText: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', maxWidth: 400, borderRadius: 16, overflow: 'hidden', elevation: 10 },
+  modalGradient: { padding: 30, alignItems: 'center' },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 255, 255, 0.3)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  iconText: { fontSize: 40 },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', marginBottom: 8, textAlign: 'center' },
+  modalSubtitle: { fontSize: 15, color: 'rgba(255, 255, 255, 0.9)', marginBottom: 20, textAlign: 'center' },
+  loadingDots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 30 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255, 255, 255, 0.7)', marginHorizontal: 5 },
+  refreshButton: { backgroundColor: 'white', paddingVertical: 14, paddingHorizontal: 40, borderRadius: 10, marginBottom: 12, width: '100%', alignItems: 'center' },
+  refreshButtonText: { color: '#059669', fontSize: 16, fontWeight: 'bold' },
+  dismissButton: { paddingVertical: 10, paddingHorizontal: 20 },
+  dismissButtonText: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 },
 });
