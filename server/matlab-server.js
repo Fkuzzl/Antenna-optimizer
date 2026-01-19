@@ -2343,6 +2343,103 @@ app.post('/api/integrated-results/read', async (req, res) => {
     }
 });
 
+// Simple paginated API endpoint for loading results in chunks of 100
+app.post('/api/integrated-results/read-page', async (req, res) => {
+    try {
+        const { projectPath, page = 1, pageSize = 100 } = req.body;
+        
+        if (!projectPath) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required parameter: projectPath'
+            });
+        }
+
+        const excelPath = path.join(projectPath, 'Integrated_Results.xlsx');
+        
+        if (!fs.existsSync(excelPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Excel file not found. Please run optimization first.'
+            });
+        }
+
+        console.log(`📖 Reading page ${page} (size: ${pageSize})`);
+
+        const workbook = XLSX.readFile(excelPath);
+        const iterationData = {};
+
+        // Read all sheets
+        ['S11_Data', 'AR_Data', 'Gain_Data'].forEach(sheetName => {
+            if (workbook.SheetNames.includes(sheetName)) {
+                const worksheet = workbook.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                for (let i = 1; i < data.length; i++) {
+                    const row = data[i];
+                    if (row && row.length >= 3) {
+                        const iteration = parseInt(row[0]);
+                        const frequency = parseFloat(row[1]);
+                        const value = parseFloat(row[2]);
+                        
+                        if (!isNaN(iteration) && !isNaN(frequency) && !isNaN(value)) {
+                            if (!iterationData[iteration]) {
+                                iterationData[iteration] = {
+                                    iteration,
+                                    frequencies: [],
+                                    s11: [],
+                                    ar: [],
+                                    gain: []
+                                };
+                            }
+                            
+                            if (!iterationData[iteration].frequencies.includes(frequency)) {
+                                iterationData[iteration].frequencies.push(frequency);
+                            }
+                            
+                            const dataType = sheetName.split('_')[0].toLowerCase();
+                            iterationData[iteration][dataType].push(value);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Sort and paginate (ascending: oldest first, so page 1 = iter 1-100, last page = newest)
+        const allIterations = Object.values(iterationData).sort((a, b) => a.iteration - b.iteration);
+        const totalIterations = allIterations.length;
+        const totalPages = Math.ceil(totalIterations / pageSize);
+        const startIdx = (page - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        const pageIterations = allIterations.slice(startIdx, endIdx);
+
+        res.json({
+            success: true,
+            data: {
+                iterations: pageIterations,
+                summary: {
+                    totalIterations,
+                    s11Available: workbook.SheetNames.includes('S11_Data'),
+                    arAvailable: workbook.SheetNames.includes('AR_Data'),
+                    gainAvailable: workbook.SheetNames.includes('Gain_Data')
+                }
+            },
+            page,
+            pageSize,
+            totalPages,
+            hasMore: page < totalPages
+        });
+
+    } catch (error) {
+        console.error('❌ Error reading page:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to read page',
+            error: error.message
+        });
+    }
+});
+
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
     console.log(`\n📛 Received ${signal}, shutting down gracefully...`);
