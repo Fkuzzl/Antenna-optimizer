@@ -193,256 +193,60 @@ const SettingsPage = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    ...(Platform.OS === 'web' && {
-      height: '100vh',
-      maxHeight: '100vh',
-      overflow: 'hidden',
-    }),
-  },
-  
-  // Header Styles
-  header: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
-    alignItems: 'flex-start',
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  headerIcon: {
-    marginBottom: 15,
-  },
-  headerIconGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerIconText: {
-    fontSize: 24,
-    color: '#8b5cf6',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  
-  // Scroll Wrapper for web compatibility
-  scrollWrapper: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-      position: 'relative',
-    }),
-  },
-  
-  // Content Styles
-  scrollView: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'scroll',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      height: '100%',
-    }),
-  },
-  scrollViewContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  
-  // Header spacer
-  headerSpacer: {
-    height: 30,
-  },
-  
-  // Section Styles
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  
-  // Loading Styles
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  
-  // Info Item Styles
-  infoItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#3b82f6',
-    marginLeft: 24,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  
-  // Info Card Styles (existing)
-  infoCard: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#eff6ff',
-    borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e40af',
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#1e40af',
-    lineHeight: 16,
-  },
-  
-  // Feature Card Styles
-  featureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  featureIcon: {
-    fontSize: 18,
-    marginRight: 12,
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  featureText: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  
-  // Reset Section Styles
-  resetSection: {
-    marginBottom: 40,
-  },
-  resetButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  resetButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  resetIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  resetHint: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 16,
-    paddingHorizontal: 20,
-  },
+  // Main Container - Root layout with full height and background color
+  container: { flex: 1, backgroundColor: '#f1f5f9', ...(Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }) },
+
+  // Header Section - Purple gradient header with back button and title
+  header: { paddingTop: 20, paddingBottom: 30, paddingHorizontal: 20 },
+  headerTop: { alignItems: 'flex-start', marginBottom: 15, marginTop: 10 },
+  backButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  backButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  headerContent: { alignItems: 'center' },
+  headerIcon: { marginBottom: 15 },
+  headerIconGradient: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  headerIconText: { fontSize: 24, color: '#8b5cf6' },
+  title: { fontSize: 28, fontWeight: '800', color: '#ffffff', textAlign: 'center', marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  subtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.9)', textAlign: 'center', fontWeight: '500' },
+
+  // Scroll Container - Wrapper for scrollable content area with web overflow handling
+  scrollWrapper: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'hidden', position: 'relative' }) },
+  scrollView: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'scroll', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', height: '100%' }) },
+  scrollViewContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  headerSpacer: { height: 30 },
+
+  // Section Components - White cards containing configuration information
+  section: { backgroundColor: '#ffffff', borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, overflow: 'hidden' },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1e293b', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+
+  // Info Display - Server configuration details with icons and values
+  infoItem: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  infoHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  infoIcon: { fontSize: 16, marginRight: 8 },
+  infoLabel: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
+  infoValue: { fontSize: 14, color: '#3b82f6', marginLeft: 24, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  infoCard: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#eff6ff', borderLeftWidth: 4, borderLeftColor: '#3b82f6' },
+  infoContent: { flex: 1 },
+  infoTitle: { fontSize: 14, fontWeight: '600', color: '#1e40af', marginBottom: 4 },
+  infoText: { fontSize: 12, color: '#1e40af', lineHeight: 16 },
+
+  // Feature Cards - List of system features with icons and descriptions
+  featureCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  featureIcon: { fontSize: 18, marginRight: 12 },
+  featureContent: { flex: 1 },
+  featureTitle: { fontSize: 15, fontWeight: '600', color: '#1e293b', marginBottom: 2 },
+  featureText: { fontSize: 13, color: '#64748b' },
+
+  // Reset Section - Setup wizard button and instructions
+  resetSection: { marginBottom: 40 },
+  resetButton: { borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
+  resetButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 20 },
+  resetIcon: { fontSize: 16, marginRight: 8 },
+  resetButtonText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  resetHint: { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 12, lineHeight: 16, paddingHorizontal: 20 },
+
+  // Loading State - Centered feedback screen for data loading
+  loadingContainer: { padding: 40, alignItems: 'center' },
+  loadingText: { fontSize: 14, color: '#64748b' },
 });
 
 export default SettingsPage;
