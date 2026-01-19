@@ -906,527 +906,114 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
-    ...(Platform.OS === 'web' && {
-      height: '100vh',
-      maxHeight: '100vh',
-      overflow: 'hidden',
-    }),
-  },
-  
-  // Header Styles
-  header: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  headerRightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerCheckButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  headerCheckButtonExists: {
-    backgroundColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  headerCheckButtonMissing: {
-    backgroundColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  headerCheckButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  headerCheckButtonTextExists: {
-    color: '#dcfce7',
-  },
-  headerCheckButtonTextMissing: {
-    color: '#fecaca',
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerStatus: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  selectionCount: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleIcon: {
-    width: 32,
-    height: 32,
-    marginRight: 12,
-  },
-  headerTitleTexts: {
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  
-  // Control Panel
-  controlPanel: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 16,
-    lineHeight: 16,
-  },
-  groundPlaneInputs: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  inputGroup: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1f2937',
-    paddingVertical: 0,
-  },
-  unitText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  optimizationToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  topTogglesRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  optimizationModeToggleCompact: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  optimizationDataToggleCompact: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  toggleInfoCompact: {
-    flex: 1,
-    marginRight: 8,
-  },
-  toggleTitleCompact: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 3,
-  },
-  toggleDescriptionCompact: {
-    fontSize: 10,
-    color: '#64748b',
-    lineHeight: 13,
-  },
-  optimizationModeToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 2,
-  },
-  toggleOptimizeAll: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#93c5fd',
-  },
-  toggleCustom: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fcd34d',
-  },
-  toggleKeepMode: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
-  },
-  toggleCleanMode: {
-    backgroundColor: '#fefbf3',
-    borderColor: '#fed7aa',
-  },
-  toggleInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  toggleTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  toggleDescription: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 16,
-  },
-  controlButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  fixedBottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-    ...(Platform.OS === 'web' && {
-      position: 'fixed',
-    }),
-  },
-  fixedBottomButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fixedBottomButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  fixedBottomButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  fixedBottomButtonSubtext: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '400',
-    marginTop: 4,
-    opacity: 0.9,
-  },
-  controlButton: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  controlButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  controlButtonDisabled: {
-    color: '#cbd5e1',
-  },
-  statsPanel: {
-    backgroundColor: '#f8fafc',
-    padding: 8,
-    borderRadius: 8,
-  },
-  statsText: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  
-  // Scroll Wrapper for web compatibility
-  scrollWrapper: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-      position: 'relative',
-    }),
-  },
-  
-  // Content
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    ...(Platform.OS === 'web' && {
-      overflow: 'scroll',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      height: '100%',
-    }),
-  },
-  contentContainer: {
-    paddingBottom: 120,
-  },
-  variableList: {
-    gap: 12,
-    paddingTop: 20,
-  },
-  scrollBottomPadding: {
-    height: 40,
-  },
-  
-  // Variable Card Styles
-  variableCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderLeftWidth: 3,
-  },
-  variableCardOptimizing: {
-    borderLeftColor: '#10b981',
-    backgroundColor: '#ffffff',
-  },
-  variableCardExcluded: {
-    borderLeftColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-    opacity: 0.7,
-  },
-  variableHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  variableInfo: {
-    flex: 1,
-  },
-  variableNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  variableName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  variableNameExcluded: {
-    color: '#94a3b8',
-    textDecorationLine: 'line-through',
-  },
-  materialBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-  },
-  materialBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#92400e',
-    letterSpacing: 0.5,
-  },
-  variableDescription: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  variableDescriptionExcluded: {
-    color: '#cbd5e1',
-  },
-  variableDetails: {
-    gap: 6,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#64748b',
-    width: 60,
-  },
-  detailValue: {
-    fontSize: 12,
-    color: '#1e293b',
-    fontWeight: '600',
-  },
-  detailValueExcluded: {
-    color: '#cbd5e1',
-  },
-  
-  // Ground Plane Configurator Button Styles
-  groundPlaneConfigButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 12,
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  configButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  configButtonIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  configButtonText: {
-    flex: 1,
-  },
-  configButtonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  configButtonSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  configButtonArrow: {
-    fontSize: 20,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  
-  // Loading and Error States
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorDetail: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  errorButton: {
-    backgroundColor: '#8b5cf6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  errorButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  // Main Container - Root layout with full height and background color
+  container: { flex: 1, backgroundColor: '#f8fafc', ...(Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }) },
+
+  // Header Section - Purple gradient header with back button, status indicators, and title
+  header: { paddingTop: 20, paddingBottom: 30, paddingHorizontal: 20 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, marginTop: 10 },
+  headerRightSection: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerCheckButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, minWidth: 100, alignItems: 'center' },
+  headerCheckButtonExists: { backgroundColor: 'rgba(16, 185, 129, 0.3)' },
+  headerCheckButtonMissing: { backgroundColor: 'rgba(239, 68, 68, 0.3)' },
+  headerCheckButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
+  headerCheckButtonTextExists: { color: '#dcfce7' },
+  headerCheckButtonTextMissing: { color: '#fecaca' },
+  backButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  backButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  headerStatus: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  selectionCount: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  headerContent: { alignItems: 'center' },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  headerTitleIcon: { width: 32, height: 32, marginRight: 12 },
+  headerTitleTexts: { alignItems: 'flex-start' },
+  title: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 4 },
+  subtitle: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)' },
+
+  // Control Panel - White card containing toggles, inputs, and control buttons
+  controlPanel: { backgroundColor: '#ffffff', marginHorizontal: 20, marginTop: 20, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 4 },
+  sectionDescription: { fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 16 },
+  controlButtons: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  controlButton: { flex: 1, backgroundColor: '#f1f5f9', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  controlButtonText: { fontSize: 14, fontWeight: '600', color: '#475569' },
+  controlButtonDisabled: { color: '#cbd5e1' },
+  statsPanel: { backgroundColor: '#f8fafc', padding: 8, borderRadius: 8 },
+  statsText: { fontSize: 12, color: '#64748b', textAlign: 'center' },
+
+  // Ground Plane Input Fields - Text inputs for Lgx, Lgy, GND_xPos, GND_yPos configuration
+  groundPlaneInputs: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  inputGroup: { flex: 1 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  textInput: { flex: 1, fontSize: 14, color: '#1f2937', paddingVertical: 0 },
+  unitText: { fontSize: 14, color: '#6b7280', fontWeight: '500', marginLeft: 4 },
+
+  // Toggle Components - Switches for optimization mode (all/custom) and data management (keep/clean)
+  topTogglesRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  optimizationModeToggleCompact: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 2 },
+  optimizationDataToggleCompact: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1 },
+  toggleInfoCompact: { flex: 1, marginRight: 8 },
+  toggleTitleCompact: { fontSize: 12, fontWeight: '700', color: '#1e293b', marginBottom: 3 },
+  toggleDescriptionCompact: { fontSize: 10, color: '#64748b', lineHeight: 13 },
+  optimizationToggle: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1 },
+  optimizationModeToggle: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 2 },
+  toggleOptimizeAll: { backgroundColor: '#eff6ff', borderColor: '#93c5fd' },
+  toggleCustom: { backgroundColor: '#fffbeb', borderColor: '#fcd34d' },
+  toggleKeepMode: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
+  toggleCleanMode: { backgroundColor: '#fefbf3', borderColor: '#fed7aa' },
+  toggleInfo: { flex: 1, marginRight: 12 },
+  toggleTitle: { fontSize: 14, fontWeight: '600', color: '#1e293b', marginBottom: 2 },
+  toggleDescription: { fontSize: 12, color: '#64748b', lineHeight: 16 },
+
+  // Ground Plane Configurator Button - Opens modal for custom/default ground plane setup
+  groundPlaneConfigButton: { borderRadius: 12, overflow: 'hidden', marginBottom: 12, shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  configButtonGradient: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16 },
+  configButtonIcon: { fontSize: 24, marginRight: 12 },
+  configButtonText: { flex: 1 },
+  configButtonTitle: { fontSize: 16, fontWeight: '700', color: '#ffffff', marginBottom: 2 },
+  configButtonSubtitle: { fontSize: 12, color: 'rgba(255, 255, 255, 0.9)' },
+  configButtonArrow: { fontSize: 20, color: '#ffffff', fontWeight: '700' },
+
+  // Fixed Bottom Action Button - Save configuration button pinned to bottom with gradient background
+  fixedBottomContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingHorizontal: 20, paddingVertical: 12, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8, ...(Platform.OS === 'web' && { position: 'fixed' }) },
+  fixedBottomButton: { borderRadius: 12, overflow: 'hidden', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  fixedBottomButtonGradient: { paddingVertical: 16, alignItems: 'center' },
+  fixedBottomButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  fixedBottomButtonSubtext: { color: '#ffffff', fontSize: 12, fontWeight: '400', marginTop: 4, opacity: 0.9 },
+
+  // Scroll Container - Wrapper for scrollable content area with web overflow handling
+  scrollWrapper: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'hidden', position: 'relative' }) },
+  content: { flex: 1, paddingHorizontal: 20, ...(Platform.OS === 'web' && { overflow: 'scroll', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', height: '100%' }) },
+  contentContainer: { paddingBottom: 120 },
+  variableList: { gap: 12, paddingTop: 20 },
+  scrollBottomPadding: { height: 40 },
+
+  // Variable Cards - Individual cards displaying antenna design variables with min/max values
+  variableCard: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderLeftWidth: 3 },
+  variableCardOptimizing: { borderLeftColor: '#10b981', backgroundColor: '#ffffff' },
+  variableCardExcluded: { borderLeftColor: '#ef4444', backgroundColor: '#fef2f2', opacity: 0.7 },
+  variableHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  variableInfo: { flex: 1 },
+  variableNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  variableName: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
+  variableNameExcluded: { color: '#94a3b8', textDecorationLine: 'line-through' },
+  materialBadge: { backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#fbbf24' },
+  materialBadgeText: { fontSize: 10, fontWeight: '700', color: '#92400e', letterSpacing: 0.5 },
+  variableDescription: { fontSize: 13, color: '#64748b' },
+  variableDescriptionExcluded: { color: '#cbd5e1' },
+  variableDetails: { gap: 6 },
+  detailRow: { flexDirection: 'row', alignItems: 'center' },
+  detailLabel: { fontSize: 12, fontWeight: '500', color: '#64748b', width: 60 },
+  detailValue: { fontSize: 12, color: '#1e293b', fontWeight: '600' },
+  detailValueExcluded: { color: '#cbd5e1' },
+
+  // Loading & Error States - Centered feedback screens for data loading and error handling
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { fontSize: 16, color: '#64748b', textAlign: 'center' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 18, fontWeight: '600', color: '#dc2626', marginBottom: 8, textAlign: 'center' },
+  errorDetail: { fontSize: 14, color: '#64748b', marginBottom: 24, textAlign: 'center' },
+  errorButton: { backgroundColor: '#8b5cf6', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  errorButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
 });
