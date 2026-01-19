@@ -10,6 +10,7 @@ export default function MatlabProjectRunner({ onBack }) {
   const [filePath, setFilePath] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTerminating, setIsTerminating] = useState(false);
+  const [isStopButtonDisabled, setIsStopButtonDisabled] = useState(false);
   const [serverStatus, setServerStatus] = useState('Disconnected');
   const [executionState, setExecutionState] = useState({
     isRunning: false,
@@ -17,6 +18,7 @@ export default function MatlabProjectRunner({ onBack }) {
     startTime: null,
     processId: null
   });
+  const stopButtonTimerRef = useRef(null);
   const [hfssProcesses, setHfssProcesses] = useState([]);
   const [pathHistory, setPathHistory] = useState([]);
   const [showPathHistory, setShowPathHistory] = useState(false);
@@ -246,8 +248,15 @@ export default function MatlabProjectRunner({ onBack }) {
     console.log(`📨 WebSocket message: ${data.type}`);
     
     switch (data.type) {
+      case 'heartbeat':
+        // Respond to server heartbeat to keep connection alive
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+        }
+        break;
+        
       case 'pong':
-        // Handle ping response
+        // Handle ping response (if we send pings)
         break;
         
       case 'status':
@@ -491,7 +500,7 @@ export default function MatlabProjectRunner({ onBack }) {
   // Reset project location (allow user to change location)
   const resetProjectLocation = () => {
     // Prevent changing location while project is running
-    if (executionState.isRunning) {
+    if (executionState?.isRunning) {
       Alert.alert(
         'Cannot Change Location',
         'Please stop the running project before changing the location.',
@@ -748,7 +757,7 @@ export default function MatlabProjectRunner({ onBack }) {
   useEffect(() => {
     let intervalId = null;
     
-    if (executionState.isRunning && executionState.startTime) {
+    if (executionState?.isRunning && executionState?.startTime) {
       // Update immediately
       setRunningTime(calculateRunningTime(executionState.startTime));
       
@@ -763,7 +772,7 @@ export default function MatlabProjectRunner({ onBack }) {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [executionState.isRunning, executionState.startTime]);
+  }, [executionState?.isRunning, executionState?.startTime]);
 
   // Create integrated Excel file when project path is validated
   const createIntegratedExcel = async () => {
@@ -875,9 +884,9 @@ export default function MatlabProjectRunner({ onBack }) {
   const updateStatusFromData = (data) => {
     if (data.execution) {
       const statusChanged = 
-        executionState.isRunning !== data.execution.isRunning ||
-        executionState.processId !== data.execution.processId ||
-        executionState.fileName !== data.execution.fileName;
+        executionState?.isRunning !== data.execution.isRunning ||
+        executionState?.processId !== data.execution.processId ||
+        executionState?.fileName !== data.execution.fileName;
 
       console.log('📡 Received status data:', {
         isRunning: data.execution.isRunning,
@@ -886,8 +895,10 @@ export default function MatlabProjectRunner({ onBack }) {
       });
 
       if (statusChanged || true) { // Always update for now to ensure sync
-        setExecutionState(data.execution);
-        console.log('📡 Status updated via WebSocket:', data.execution.isRunning ? 'Running' : 'Stopped');
+        if (data.execution) {
+          setExecutionState(data.execution);
+          console.log('📡 Status updated via WebSocket:', data.execution.isRunning ? 'Running' : 'Stopped');
+        }
       }
     }
 
@@ -1013,6 +1024,10 @@ export default function MatlabProjectRunner({ onBack }) {
         console.log('🧹 Clearing fallback interval');
         clearInterval(fallbackInterval);
       }
+      // Cleanup stop button timer on unmount
+      if (stopButtonTimerRef.current) {
+        clearTimeout(stopButtonTimerRef.current);
+      }
     };
   }, [wsConnected, wsReconnectCount]);
 
@@ -1021,6 +1036,29 @@ export default function MatlabProjectRunner({ onBack }) {
       Alert.alert('Error', 'Please enter a file path');
       return;
     }
+
+    // IMMEDIATE STATE CHANGE - Set running state before API call for instant UI feedback
+    const fileName = filePath.split(/[\\\/]/).pop();
+    setExecutionState({
+      isRunning: true,
+      fileName: fileName,
+      startTime: new Date().toISOString(),
+      processId: null
+    });
+    
+    // Disable stop button for 10 seconds to allow program to stabilize
+    setIsStopButtonDisabled(true);
+    
+    // Clear any existing timer
+    if (stopButtonTimerRef.current) {
+      clearTimeout(stopButtonTimerRef.current);
+    }
+    
+    // Enable stop button after 10 seconds
+    stopButtonTimerRef.current = setTimeout(() => {
+      setIsStopButtonDisabled(false);
+      console.log('✅ Stop button enabled - program stabilized');
+    }, 10000);
 
     setIsLoading(true);
 
@@ -1037,6 +1075,7 @@ export default function MatlabProjectRunner({ onBack }) {
       const result = await response.json();
 
       if (result.success) {
+        // Update with actual execution data from server
         setExecutionState(result.execution);
         // Initialize iteration tracking
         setIterationData({
@@ -1055,10 +1094,34 @@ export default function MatlabProjectRunner({ onBack }) {
           `MATLAB is running your project.\n\nMonitor progress in real-time below.`
         );
       } else {
+        // Revert to stopped state if API call fails
+        setExecutionState({
+          isRunning: false,
+          fileName: null,
+          startTime: null,
+          processId: null
+        });
+        setIsStopButtonDisabled(false);
+        if (stopButtonTimerRef.current) {
+          clearTimeout(stopButtonTimerRef.current);
+          stopButtonTimerRef.current = null;
+        }
         Alert.alert('Error', result.message);
       }
     } catch (error) {
       console.error('Error running project:', error);
+      // Revert to stopped state on error
+      setExecutionState({
+        isRunning: false,
+        fileName: null,
+        startTime: null,
+        processId: null
+      });
+      setIsStopButtonDisabled(false);
+      if (stopButtonTimerRef.current) {
+        clearTimeout(stopButtonTimerRef.current);
+        stopButtonTimerRef.current = null;
+      }
       Alert.alert('Error', 'Cannot start project');
     } finally {
       setIsLoading(false);
@@ -1066,6 +1129,12 @@ export default function MatlabProjectRunner({ onBack }) {
   };
 
   const handleStopMatlab = async () => {
+    // Clear the stop button timer if it's still running
+    if (stopButtonTimerRef.current) {
+      clearTimeout(stopButtonTimerRef.current);
+      stopButtonTimerRef.current = null;
+    }
+    
     // Show immediate feedback
     Alert.alert(
       'Stopping Project',
@@ -1075,6 +1144,7 @@ export default function MatlabProjectRunner({ onBack }) {
     
     setIsLoading(true);
     setIsTerminating(true);
+    setIsStopButtonDisabled(false);
     
     try {
       const response = await fetch(`${MATLAB_SERVER_URL}/api/matlab/stop`, 
@@ -1271,10 +1341,10 @@ export default function MatlabProjectRunner({ onBack }) {
 
             <View style={styles.headerStatusCard}>
               <View style={[styles.headerStatusContent, 
-                executionState.isRunning ? styles.headerStatusRunning : styles.headerStatusReady
+                executionState?.isRunning ? styles.headerStatusRunning : styles.headerStatusReady
               ]}>
                 <View style={styles.headerStatusIconContainer}>
-                  {executionState.isRunning ? (
+                  {executionState?.isRunning ? (
                     <Image 
                       source={require('../assets/program_running.gif')} 
                       style={styles.headerStatusIcon}
@@ -1291,7 +1361,7 @@ export default function MatlabProjectRunner({ onBack }) {
                 <View style={styles.headerStatusTexts}>
                   <Text style={styles.headerStatusTitle}>MATLAB</Text>
                   <Text style={styles.headerStatusValue}>
-                    {executionState.isRunning ? 'Running' : 'Ready'}
+                    {executionState?.isRunning ? 'Running' : 'Ready'}
                   </Text>
                 </View>
               </View>
@@ -1346,7 +1416,7 @@ export default function MatlabProjectRunner({ onBack }) {
         )}
 
         {/* Combined MATLAB & HFSS Session Card - Compact design */}
-        {(executionState.isRunning || hfssProcesses.length > 0) && (
+        {(executionState?.isRunning || hfssProcesses.length > 0) && (
           <View style={styles.detailsCard}>
             <View style={styles.detailsCardHeader}>
               <View style={styles.detailsIcon}>
@@ -1372,7 +1442,7 @@ export default function MatlabProjectRunner({ onBack }) {
             </View>
             
             {/* MATLAB Session Section */}
-            {executionState.isRunning && (
+            {executionState?.isRunning && (
               <View style={styles.sessionSection}>
                 <View style={styles.sessionHeader}>
                   <Text style={styles.sessionIcon}>📊</Text>
@@ -1445,7 +1515,7 @@ export default function MatlabProjectRunner({ onBack }) {
               </Text>
               <Text style={styles.sectionSubtitle}>
                 {projectLocationConfirmed 
-                  ? executionState.isRunning 
+                  ? executionState?.isRunning 
                     ? `🔄 Running: ${filePath.split('\\').pop() || filePath.split('/').pop()}` 
                     : `Ready to launch: ${filePath.split('\\').pop() || filePath.split('/').pop()}` 
                   : 'Confirm your project location to continue'
@@ -1457,13 +1527,13 @@ export default function MatlabProjectRunner({ onBack }) {
                 onPress={resetProjectLocation} 
                 style={[
                   styles.changeLocationButton,
-                  executionState.isRunning && styles.changeLocationButtonDisabled
+                  executionState?.isRunning && styles.changeLocationButtonDisabled
                 ]}
-                disabled={executionState.isRunning}
+                disabled={executionState?.isRunning}
               >
                 <Text style={[
                   styles.changeLocationText,
-                  executionState.isRunning && styles.changeLocationTextDisabled
+                  executionState?.isRunning && styles.changeLocationTextDisabled
                 ]}>
                   Change
                 </Text>
@@ -1494,7 +1564,7 @@ export default function MatlabProjectRunner({ onBack }) {
             </View>
             
             {/* Only show text input if location is not confirmed AND MATLAB is not running */}
-            {!projectLocationConfirmed && !executionState.isRunning && (
+            {!projectLocationConfirmed && !executionState?.isRunning && (
               <TextInput
                 style={styles.pathInput}
                 value={filePath}
@@ -1504,12 +1574,12 @@ export default function MatlabProjectRunner({ onBack }) {
                 placeholderTextColor="#94a3b8"
                 multiline={true}
                 numberOfLines={2}
-                editable={!executionState.isRunning}
+                editable={!executionState?.isRunning}
               />
             )}
             
             {/* Show info message when MATLAB is running */}
-            {executionState.isRunning && !projectLocationConfirmed && (
+            {executionState?.isRunning && !projectLocationConfirmed && (
               <View style={styles.runningInfoBox}>
                 <Text style={styles.runningInfoIcon}>🔒</Text>
                 <Text style={styles.runningInfoText}>
@@ -1562,7 +1632,7 @@ export default function MatlabProjectRunner({ onBack }) {
                       <View style={styles.pathActionsRow}>
                         <View style={styles.pathStatusBadge}>
                           <Text style={styles.pathStatusText}>
-                            {executionState.isRunning ? '🟡 Running' : '🟢 Ready to Launch'}
+                            {executionState?.isRunning ? '🟡 Running' : '🟢 Ready to Launch'}
                           </Text>
                         </View>
                         <TouchableOpacity 
@@ -1758,39 +1828,39 @@ export default function MatlabProjectRunner({ onBack }) {
             <TouchableOpacity 
               onPress={handleRunProject} 
               style={[styles.floatingActionButton, styles.floatingPrimaryAction]}
-              disabled={isLoading || executionState.isRunning}
+              disabled={isLoading || executionState?.isRunning}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={executionState.isRunning ? ['#94a3b8', '#64748b'] : ['#059669', '#10b981']}
+                colors={executionState?.isRunning ? ['#94a3b8', '#64748b'] : ['#059669', '#10b981']}
                 style={styles.floatingActionButtonGradient}
               >
                 <Text style={styles.floatingActionButtonIcon}>
-                  {executionState.isRunning ? '🔄' : '▶️'}
+                  {executionState?.isRunning ? '🔄' : '▶️'}
                 </Text>
                 <Text style={styles.floatingActionButtonText}>
-                  {executionState.isRunning ? 'Running...' : 'Launch'}
+                  {executionState?.isRunning ? 'Running...' : 'Launch'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
             
             {/* Stop Button - Only show when running */}
-            {executionState.isRunning ? (
+            {executionState?.isRunning ? (
               <TouchableOpacity 
                 onPress={handleStopMatlab} 
                 style={[styles.floatingActionButton, styles.floatingSecondaryAction]}
-                disabled={isLoading || isTerminating}
+                disabled={isLoading || isTerminating || isStopButtonDisabled}
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={isTerminating ? ['#e2e8f0', '#cbd5e1'] : ['#ef4444', '#dc2626']}
+                  colors={(isTerminating || isStopButtonDisabled) ? ['#e2e8f0', '#cbd5e1'] : ['#ef4444', '#dc2626']}
                   style={styles.floatingActionButtonGradient}
                 >
                   <Text style={styles.floatingActionButtonIcon}>⏹️</Text>
                   <Text style={[styles.floatingActionButtonText, 
-                    isTerminating ? styles.disabledActionText : styles.enabledActionText
+                    (isTerminating || isStopButtonDisabled) ? styles.disabledActionText : styles.enabledActionText
                   ]}>
-                    {isTerminating ? 'Terminating...' : 'Stop'}
+                    {isTerminating ? 'Terminating...' : isStopButtonDisabled ? 'Stop (Wait...)' : 'Stop'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -1828,1222 +1898,242 @@ export default function MatlabProjectRunner({ onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    ...(Platform.OS === 'web' && {
-      height: '100vh',
-      maxHeight: '100vh',
-      overflow: 'hidden',
-    }),
-  },
+  // Main Container
+  container: { flex: 1, backgroundColor: '#f8fafc', ...(Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }) },
   
   // Loading Panel Styles
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingPanel: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-  },
-  loadingPanelGradient: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  loadingIcon: {
-    width: 60,
-    height: 60,
-  },
-  loadingTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  loadingMessage: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  loadingSpinnerContainer: {
-    marginTop: 8,
-  },
-  loadingSpinner: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  spinnerDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#ffffff',
-    ...(Platform.OS === 'web' && {
-      animation: 'pulse 1.4s ease-in-out infinite',
-    }),
-  },
+  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
+  loadingPanel: { width: '90%', maxWidth: 400, borderRadius: 20, overflow: 'hidden', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20 },
+  loadingPanelGradient: { padding: 40, alignItems: 'center' },
+  loadingIconContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255, 255, 255, 0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  loadingIcon: { width: 60, height: 60 },
+  loadingTitle: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginBottom: 12, textAlign: 'center' },
+  loadingMessage: { fontSize: 16, color: 'rgba(255, 255, 255, 0.9)', marginBottom: 24, textAlign: 'center' },
+  loadingSpinnerContainer: { marginTop: 8 },
+  loadingSpinner: { flexDirection: 'row', gap: 8 },
+  spinnerDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#ffffff', ...(Platform.OS === 'web' && { animation: 'pulse 1.4s ease-in-out infinite' }) },
+  dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, backgroundColor: 'rgba(0, 0, 0, 0.1)' },
   
-  // Dropdown overlay - positioned to allow dropdown interaction
-  dropdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
+  // Header Styles - Compact design
+  header: { paddingTop: 15, paddingBottom: 16, paddingHorizontal: 20 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 8 },
+  backButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  backButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  headerStatus: { alignItems: 'center' },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusDotGreen: { backgroundColor: '#ffffff', shadowColor: '#10b981', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, shadowRadius: 4 },
+  statusDotYellow: { backgroundColor: '#ffffff', shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, shadowRadius: 4 },
+  statusDotRed: { backgroundColor: '#ffffff', shadowColor: '#ef4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, shadowRadius: 4 },
+  scrollWrapper: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'hidden', position: 'relative' }) },
   
-  // Header Styles - Compact design for better space usage
-  header: {
-    paddingTop: 15,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerStatus: {
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  statusDotGreen: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  statusDotYellow: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  statusDotRed: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  
-  // Scroll Wrapper for web compatibility
-  scrollWrapper: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'hidden',
-      position: 'relative',
-    }),
-  },
-  
-  // Header Content - Horizontal layout different from index
-  headerContent: {
-    alignItems: 'center',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  titleIconText: {
-    fontSize: 20,
-    color: '#ffffff',
-  },
-  titleIconImage: {
-    width: 24,
-    height: 24,
-  },
-  titleTexts: {
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
+  // Header Content - Horizontal layout
+  headerContent: { alignItems: 'center' },
+  titleContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  titleIcon: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  titleIconText: { fontSize: 20, color: '#ffffff' },
+  titleIconImage: { width: 24, height: 24 },
+  titleTexts: { alignItems: 'flex-start' },
+  title: { fontSize: 20, fontWeight: '700', color: '#ffffff', marginBottom: 2 },
+  subtitle: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
   
   // Header Status Styles
-  headerStatusOverview: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 24,
-    gap: 16,
-    paddingHorizontal: 8,
-  },
-  headerStatusCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    flex: 1,
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerStatusContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerStatusRunning: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-  },
-  headerStatusReady: {
-    backgroundColor: 'rgba(100, 116, 139, 0.1)',
-    borderColor: 'rgba(100, 116, 139, 0.3)',
-  },
-  headerStatusIconContainer: {
-    width: 28,
-    height: 28,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerStatusIcon: {
-    width: 22,
-    height: 22,
-  },
-  headerStatusTexts: {
-    alignItems: 'flex-start',
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 8,
-    marginHorizontal: 2,
-    minHeight: 45,
-    justifyContent: 'center',
-  },
-  headerStatusTitle: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  headerStatusValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  autoManagerIndicator: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#F59E0B',
-    textAlign: 'center',
-  },
-  wsStatsText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginTop: 1,
-    textShadowColor: 'rgba(76, 175, 80, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+  headerStatusOverview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, gap: 16, paddingHorizontal: 8 },
+  headerStatusCard: { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)', flex: 1, shadowColor: 'rgba(0, 0, 0, 0.1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  headerStatusContent: { flexDirection: 'row', alignItems: 'center' },
+  headerStatusRunning: { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' },
+  headerStatusReady: { backgroundColor: 'rgba(100, 116, 139, 0.1)', borderColor: 'rgba(100, 116, 139, 0.3)' },
+  headerStatusIconContainer: { width: 28, height: 28, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  headerStatusIcon: { width: 22, height: 22 },
+  headerStatusTexts: { alignItems: 'flex-start', flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 8, padding: 8, marginHorizontal: 2, minHeight: 45, justifyContent: 'center' },
+  headerStatusTitle: { fontSize: 11, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  headerStatusValue: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+  autoManagerIndicator: { fontSize: 13, fontWeight: '600', color: '#F59E0B', textAlign: 'center' },
+  wsStatsText: { fontSize: 9, fontWeight: '600', color: '#4CAF50', marginTop: 1, textShadowColor: 'rgba(76, 175, 80, 0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   
-  // Header Results Button Styles
-  headerResultsButtonSection: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerResultsButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  headerResultsButtonGradient: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  headerResultsButtonIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  headerResultsButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
+  // Header Results Button
+  headerResultsButtonSection: { backgroundColor: '#f8fafc', paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  headerResultsButton: { borderRadius: 12, overflow: 'hidden', shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  headerResultsButtonGradient: { paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  headerResultsButtonIcon: { fontSize: 18, marginRight: 10 },
+  headerResultsButtonText: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
   
   // Content Styles
-  content: {
-    flex: 1,
-    ...(Platform.OS === 'web' && {
-      overflow: 'scroll',
-      overflowX: 'hidden',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-      height: '100%',
-    }),
-  },
-  contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 120, // Extra padding for floating action bar
-  },
-  contentContainerExpanded: {
-    paddingBottom: 480, // Extra padding when dropdown is open + floating action bar
-  },
+  content: { flex: 1, ...(Platform.OS === 'web' && { overflow: 'scroll', overflowX: 'hidden', overflowY: 'auto', WebkitOverflowScrolling: 'touch', height: '100%' }) },
+  contentContainer: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 120 },
+  contentContainerExpanded: { paddingBottom: 480 },
   
-  // Status Overview - Compact horizontal cards 
-  statusOverview: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  statusCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  statusCardGradient: {
-    padding: 12,
-  },
-  statusCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusCardIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  statusCardIconContainer: {
-    width: 32,
-    height: 32,
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusCardIconImage: {
-    width: 28,
-    height: 28,
-  },
-  statusCardTexts: {
-    flex: 1,
-  },
-  statusCardTitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  statusCardValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  statusConnected: {
-    color: '#ffffff',
-  },
-  statusWarning: {
-    color: '#ffffff',
-  },
-  statusError: {
-    color: '#ffffff',
-  },
+  // Status Overview - Compact horizontal cards
+  statusOverview: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  statusCard: { flex: 1, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
+  statusCardGradient: { padding: 12 },
+  statusCardContent: { flexDirection: 'row', alignItems: 'center' },
+  statusCardIcon: { fontSize: 20, marginRight: 12 },
+  statusCardIconContainer: { width: 32, height: 32, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  statusCardIconImage: { width: 28, height: 28 },
+  statusCardTexts: { flex: 1 },
+  statusCardTitle: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '600', marginBottom: 2 },
+  statusCardValue: { fontSize: 14, fontWeight: '700' },
+  statusConnected: { color: '#ffffff' },
+  statusWarning: { color: '#ffffff' },
+  statusError: { color: '#ffffff' },
   
-  // Details Card - Different from index cards
-  detailsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  detailsCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  detailsIcon: {
-    display: 'none', // Hide icon
-  },
-  detailsIconText: {
-    fontSize: 16,
-  },
-  detailsCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  infoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e0f2fe',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#0ea5e9',
-  },
-  infoIconText: {
-    fontSize: 14,
-  },
+  // Details Card
+  detailsCard: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, borderLeftWidth: 4, borderLeftColor: '#10b981' },
+  detailsCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  detailsIcon: { display: 'none' },
+  detailsIconText: { fontSize: 16 },
+  detailsCardTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b', flex: 1 },
+  infoIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#0ea5e9' },
+  infoIconText: { fontSize: 14 },
+  sessionSection: { marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  sessionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  sessionIcon: { fontSize: 16, marginRight: 8 },
+  sessionIconImageContainer: { width: 20, height: 20, marginRight: 8, justifyContent: 'center', alignItems: 'center' },
+  sessionIconImage: { width: 18, height: 18 },
+  sessionTitle: { fontSize: 14, fontWeight: '600', color: '#1e293b', flex: 1 },
+  sessionStatus: { fontSize: 12, fontWeight: '600', color: '#059669' },
+  sessionDetails: { paddingLeft: 24 },
+  sessionDetailText: { fontSize: 12, color: '#64748b', lineHeight: 16 },
+  detailsGrid: { gap: 8 },
+  detailsItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  detailsLabel: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+  detailsValue: { fontSize: 14, color: '#1e293b', fontWeight: '600' },
+  detailsStatusOpen: { color: '#059669', fontWeight: '600' },
   
-  // Combined session styles
-  sessionSection: {
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  sessionIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  sessionIconImageContainer: {
-    width: 20,
-    height: 20,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sessionIconImage: {
-    width: 18,
-    height: 18,
-  },
-  sessionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  sessionStatus: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  sessionDetails: {
-    paddingLeft: 24,
-  },
-  sessionDetailText: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 16,
-  },
-  detailsGrid: {
-    gap: 8,
-  },
-  detailsItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  detailsLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  detailsValue: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '600',
-  },
-  detailsStatusOpen: {
-    color: '#059669',
-    fontWeight: '600',
-  },
+  // Control Section
+  controlSection: { backgroundColor: '#ffffff', borderRadius: 16, padding: 18, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 8, zIndex: 1 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  sectionIcon: { display: 'none' },
+  sectionIconText: { fontSize: 18 },
+  sectionTexts: { flex: 1 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1e293b', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 14, color: '#64748b' },
+  inputContainer: { marginBottom: 16, position: 'relative', zIndex: 1000 },
+  inputContainerExpanded: { marginBottom: 320 },
+  inputHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#374151', flex: 1 },
+  inputActions: { flexDirection: 'row', gap: 8 },
+  historyButton: { backgroundColor: '#6366f1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: '#6366f1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  historyButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
+  pasteButton: { backgroundColor: '#3b82f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  pasteButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
+  pathInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 16, fontSize: 14, color: '#1e293b', minHeight: 60, textAlignVertical: 'top' },
+  runningInfoBox: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fbbf24', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  runningInfoIcon: { fontSize: 20, marginRight: 12 },
+  runningInfoText: { flex: 1, fontSize: 14, color: '#92400e', fontWeight: '500' },
   
-  // Control Section - Compact layout for better visibility
-  controlSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
-    zIndex: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionIcon: {
-    display: 'none', // Hide icon
-  },
-  sectionIconText: {
-    fontSize: 18,
-  },
-  sectionTexts: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-  },
+  // Path History Dropdown
+  historyDropdown: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 20, zIndex: 2000, maxHeight: 300, marginTop: 8 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  historyTitle: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
+  clearHistoryButton: { backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  clearHistoryText: { color: '#ffffff', fontSize: 11, fontWeight: '600' },
+  historyList: { maxHeight: 200 },
+  historyItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f8fafc', minHeight: 44, backgroundColor: 'transparent' },
+  historyItemContent: { flex: 1 },
+  historyItemFileName: { fontSize: 13, fontWeight: '600', color: '#1e293b', marginBottom: 4 },
+  historyItemPath: { fontSize: 11, color: '#64748b', lineHeight: 14 },
+  historyItemIndicator: { marginLeft: 8 },
+  historyItemArrow: { fontSize: 12, color: '#94a3b8' },
+  historyFooter: { padding: 12, backgroundColor: '#f8fafc', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+  historyFooterText: { fontSize: 11, color: '#64748b', textAlign: 'center', fontStyle: 'italic' },
   
-  // Input Container - Compact spacing
-  inputContainer: {
-    marginBottom: 16,
-    position: 'relative',
-    zIndex: 1000,
-  },
-  inputContainerExpanded: {
-    marginBottom: 320, // Extra space when dropdown is open
-  },
-  inputHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    flex: 1,
-  },
-  inputActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  historyButton: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  historyButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  pasteButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  pasteButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  pathInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 14,
-    color: '#1e293b',
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  
-  // Running Info Box Styles
-  runningInfoBox: {
-    backgroundColor: '#fef3c7',
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  runningInfoIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  runningInfoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#92400e',
-    fontWeight: '500',
-  },
-  
-  // Path History Dropdown Styles
-  historyDropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
-    zIndex: 2000,
-    maxHeight: 300,
-    marginTop: 8,
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  historyTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  clearHistoryButton: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  clearHistoryText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  historyList: {
-    maxHeight: 200,
-  },
-  historyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
-    minHeight: 44, // Ensure minimum touch target height
-    backgroundColor: 'transparent',
-  },
-  historyItemContent: {
-    flex: 1,
-  },
-  historyItemFileName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  historyItemPath: {
-    fontSize: 11,
-    color: '#64748b',
-    lineHeight: 14,
-  },
-  historyItemIndicator: {
-    marginLeft: 8,
-  },
-  historyItemArrow: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  historyFooter: {
-    padding: 12,
-    backgroundColor: '#f8fafc',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  historyFooterText: {
-    fontSize: 11,
-    color: '#64748b',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  
-  // Action Grid - Three buttons layout
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  actionButtonGradient: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  actionButtonIcon: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  enabledActionText: {
-    color: '#ffffff',
-  },
-  disabledActionText: {
-    color: '#64748b',
-  },
+  // Action Grid
+  actionGrid: { flexDirection: 'row', gap: 8 },
+  actionButton: { flex: 1, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
+  actionButtonGradient: { paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center' },
+  actionButtonIcon: { fontSize: 16, marginBottom: 4 },
+  actionButtonText: { fontSize: 14, fontWeight: '600' },
+  enabledActionText: { color: '#ffffff' },
+  disabledActionText: { color: '#64748b' },
   
   // HFSS Process Styles
-  hfssProcessList: {
-    gap: 12,
-  },
-  hfssProcessHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  hfssProcessCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  hfssProcessStatus: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#059669',
-  },
-  hfssProcessCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#10b981',
-  },
-  hfssProcessIcon: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#ecfdf5',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  hfssProcessIconText: {
-    fontSize: 14,
-  },
-  hfssProcessIconImage: {
-    width: 20,
-    height: 20,
-  },
-  hfssProcessInfo: {
-    flex: 1,
-  },
-  hfssProcessName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  hfssProcessDetail: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 16,
-  },
-  hfssProcessIndicator: {
-    alignItems: 'center',
-  },
-  hfssProcessDot: {
-    fontSize: 12,
-    color: '#10b981',
-  },
+  hfssProcessList: { gap: 12 },
+  hfssProcessHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  hfssProcessCount: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
+  hfssProcessStatus: { fontSize: 12, fontWeight: '500', color: '#059669' },
+  hfssProcessCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: '#10b981' },
+  hfssProcessIcon: { width: 32, height: 32, backgroundColor: '#ecfdf5', borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  hfssProcessIconText: { fontSize: 14 },
+  hfssProcessIconImage: { width: 20, height: 20 },
+  hfssProcessInfo: { flex: 1 },
+  hfssProcessName: { fontSize: 14, fontWeight: '600', color: '#1e293b', marginBottom: 2 },
+  hfssProcessDetail: { fontSize: 12, color: '#64748b', lineHeight: 16 },
+  hfssProcessIndicator: { alignItems: 'center' },
+  hfssProcessDot: { fontSize: 12, color: '#10b981' },
   
-  // Compact Guide Card Styles  
-  guideCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  guideHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  guideIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  guideHeaderTexts: {
-    flex: 1,
-  },
-  guideToggleIcon: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  guideTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  guideSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  guideStepsList: {
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  guideStepItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  guideStepNumber: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#10b981',
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
-  },
-  guideStepNumberText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  guideStepContent: {
-    flex: 1,
-  },
-  guideStepTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  guideStepDescription: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 18,
-  },
-  guideFeatures: {
-    marginBottom: 12,
-  },
-  guideFeaturesTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  guideFeaturesList: {
-    gap: 4,
-  },
-  guideFeature: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
-  },
-  guideNote: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f9ff',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#0ea5e9',
-  },
-  guideNoteIcon: {
-    fontSize: 14,
-    marginRight: 8,
-    marginTop: 1,
-  },
-  guideNoteText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#0369a1',
-    lineHeight: 16,
-  },
+  // Compact Guide Card
+  guideCard: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+  guideHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  guideIcon: { fontSize: 20, marginRight: 12 },
+  guideHeaderTexts: { flex: 1 },
+  guideToggleIcon: { fontSize: 14, color: '#64748b', fontWeight: '600', marginLeft: 8 },
+  guideTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b', marginBottom: 2 },
+  guideSubtitle: { fontSize: 12, color: '#64748b', fontWeight: '500' },
+  guideStepsList: { gap: 12, marginTop: 16, marginBottom: 16 },
+  guideStepItem: { flexDirection: 'row', alignItems: 'flex-start' },
+  guideStepNumber: { width: 28, height: 28, backgroundColor: '#10b981', borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 2 },
+  guideStepNumberText: { fontSize: 12, fontWeight: '700', color: '#ffffff' },
+  guideStepContent: { flex: 1 },
+  guideStepTitle: { fontSize: 14, fontWeight: '600', color: '#1e293b', marginBottom: 4 },
+  guideStepDescription: { fontSize: 13, color: '#64748b', lineHeight: 18 },
+  guideFeatures: { marginBottom: 12 },
+  guideFeaturesTitle: { fontSize: 14, fontWeight: '600', color: '#1e293b', marginBottom: 8 },
+  guideFeaturesList: { gap: 4 },
+  guideFeature: { fontSize: 12, color: '#475569', lineHeight: 16 },
+  guideNote: { flexDirection: 'row', backgroundColor: '#f0f9ff', padding: 12, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: '#0ea5e9' },
+  guideNoteIcon: { fontSize: 14, marginRight: 8, marginTop: 1 },
+  guideNoteText: { flex: 1, fontSize: 12, color: '#0369a1', lineHeight: 16 },
   
-  // Enhanced validation message styles
-  validationMessage: {
-    marginTop: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  validationSuccess: {
-    backgroundColor: '#ecfdf5',
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  validationError: {
-    backgroundColor: '#fef2f2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
-  },
-  validationContent: {
-    padding: 12,
-  },
-  validationText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  validationTextSuccess: {
-    color: '#059669',
-  },
-  validationTextError: {
-    color: '#dc2626',
-  },
+  // Validation Messages
+  validationMessage: { marginTop: 12, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+  validationSuccess: { backgroundColor: '#ecfdf5', borderLeftWidth: 4, borderLeftColor: '#10b981' },
+  validationError: { backgroundColor: '#fef2f2', borderLeftWidth: 4, borderLeftColor: '#ef4444' },
+  validationContent: { padding: 12 },
+  validationText: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  validationTextSuccess: { color: '#059669' },
+  validationTextError: { color: '#dc2626' },
   
-  // Path details card styles
-  pathDetailsCard: {
-    marginTop: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#d1fae5',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  pathDetailsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f9ff',
-  },
-  pathDetailsIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  pathDetailsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  pathDetailsGrid: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  pathDetailItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  pathDetailLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748b',
-    width: 80,
-    marginRight: 8,
-  },
-  pathDetailValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  pathDetailDirectory: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
-  },
-  pathActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  pathStatusBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  pathStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#166534',
-  },
-  copyPathButton: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  copyPathText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1d4ed8',
-  },
+  // Path Details Card
+  pathDetailsCard: { marginTop: 12, backgroundColor: '#ffffff', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#d1fae5', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  pathDetailsHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#f0f9ff' },
+  pathDetailsIcon: { fontSize: 16, marginRight: 8 },
+  pathDetailsTitle: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
+  pathDetailsGrid: { gap: 8, marginBottom: 8 },
+  pathDetailItem: { flexDirection: 'row', alignItems: 'flex-start' },
+  pathDetailLabel: { fontSize: 13, fontWeight: '500', color: '#64748b', width: 80, marginRight: 8 },
+  pathDetailValue: { fontSize: 13, fontWeight: '600', color: '#1e293b', flex: 1 },
+  pathDetailDirectory: { fontSize: 12, color: '#475569', lineHeight: 16 },
+  pathActionsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  pathStatusBadge: { backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#bbf7d0' },
+  pathStatusText: { fontSize: 12, fontWeight: '600', color: '#166534' },
+  copyPathButton: { backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe' },
+  copyPathText: { fontSize: 12, fontWeight: '600', color: '#1d4ed8' },
+  changeLocationButton: { backgroundColor: 'rgba(59, 130, 246, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#3b82f6' },
+  changeLocationButtonDisabled: { backgroundColor: 'rgba(148, 163, 184, 0.1)', borderColor: '#94a3b8', opacity: 0.5 },
+  changeLocationText: { fontSize: 12, fontWeight: '600', color: '#3b82f6' },
+  changeLocationTextDisabled: { color: '#94a3b8' },
+  confirmAction: { flex: 1 },
   
-  // Project location validation styles
-  changeLocationButton: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  changeLocationButtonDisabled: {
-    backgroundColor: 'rgba(148, 163, 184, 0.1)',
-    borderColor: '#94a3b8',
-    opacity: 0.5,
-  },
-  changeLocationText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3b82f6',
-  },
-  changeLocationTextDisabled: {
-    color: '#94a3b8',
-  },
-  confirmAction: {
-    flex: 1,
-  },
+  // Floating Action Bar
+  floatingActionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12, paddingBottom: 20, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10, ...(Platform.OS === 'web' && { boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.1)' }) },
+  floatingActionGrid: { flexDirection: 'row', gap: 8 },
+  floatingActionButton: { flex: 1, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 },
+  floatingActionButtonGradient: { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  floatingActionButtonIcon: { fontSize: 16, marginRight: 6 },
+  floatingActionButtonIconImage: { width: 24, height: 24, marginRight: 8 },
+  floatingActionButtonText: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
+  floatingSecondaryAction: { marginLeft: 10 },
+  floatingOptimizeAction: { marginTop: 10 },
+  floatingResultsAction: { marginTop: 10, marginLeft: 10 },
   
-  // Floating Action Bar Styles
-  floatingActionBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingTop: 12,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-    ...(Platform.OS === 'web' && {
-      boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.1)',
-    }),
-  },
-  floatingActionGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  floatingActionButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  floatingActionButtonGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  floatingActionButtonIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  floatingActionButtonIconImage: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
-  },
-  floatingActionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  floatingSecondaryAction: {
-    marginLeft: 10,
-  },
-  floatingOptimizeAction: {
-    marginTop: 10,
-  },
-  floatingResultsAction: {
-    marginTop: 10,
-    marginLeft: 10,
-  },
-  enabledActionText: {
-    color: '#ffffff',
-  },
-  disabledActionText: {
-    color: '#9ca3af',
-  },
-  
-  // Results Button Section Styles
-  resultsButtonSection: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginVertical: 15,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    padding: 16,
-  },
-  resultsButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  resultsButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  resultsButtonIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  resultsButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  managementButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 10,
-  },
+  // Results Button Section
+  resultsButtonSection: { backgroundColor: '#ffffff', marginHorizontal: 20, marginVertical: 15, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, padding: 16 },
+  resultsButton: { borderRadius: 12, overflow: 'hidden', shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  resultsButtonGradient: { paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  resultsButtonIcon: { fontSize: 20, marginRight: 10 },
+  resultsButtonText: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
+  managementButtonsRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
 });
 
 // Add CSS animation for web platform
