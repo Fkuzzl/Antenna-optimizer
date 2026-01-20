@@ -10,7 +10,7 @@ const serverConfig = setupConfig.getServerConfig();
 
 // PID file to track server process
 const PID_FILE = path.join(__dirname, 'server.pid');
-const SERVER_SCRIPT = path.join(__dirname, 'matlab-server.js');
+const SERVER_SCRIPT = path.join(__dirname, 'server.js');
 
 // Check if server is already running
 function checkExistingServer() {
@@ -102,8 +102,8 @@ function startServer() {
             startupOutput += output;
             process.stdout.write(output);
             
-            // Check if server started successfully
-            if (output.includes('MATLAB & HFSS Server running')) {
+            // Check if server started successfully (V2 output format)
+            if (output.includes('MATLAB-HFSS Server v2 running')) {
                 resolve(serverProcess);
             }
         });
@@ -138,7 +138,7 @@ function startServer() {
         
         // Timeout after 10 seconds if server doesn't start
         setTimeout(() => {
-            if (startupOutput.includes('MATLAB & HFSS Server running')) {
+            if (startupOutput.includes('MATLAB-HFSS Server v2 running')) {
                 return; // Already resolved
             }
             

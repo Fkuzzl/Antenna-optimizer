@@ -28,15 +28,15 @@ Complete technical documentation for the MATLAB-HFSS Antenna Optimization System
 - LinearGradient for modern UI
 
 **Backend:**
-- Node.js + Express 5.1.0
+- Node.js + Express 5.1.0 (Modular V2 Architecture)
 - WebSocket (ws 8.18.3) for real-time updates
-- express-rate-limit for API protection
+- Winston logger with file rotation
 - Python 3.8+ for data processing
 - MATLAB R2020b+ + HFSS integration
 
 **Network Architecture:**
 - HTTP API: Port 3001
-- WebSocket: Port 3001/ws
+- WebSocket: Port 3001 (same server)
 - Expo Dev Server: Port 8081
 - Multi-URL fallback system
 
@@ -54,9 +54,32 @@ fyp_project_current/
 │   ├── AboutPage.jsx                 # App information
 │   └── SettingsPage.jsx              # Configuration display
 │
-├── server/                           # Node.js Backend
-│   ├── matlab-server.js              # Main server (Port 3001)
+├── server/                           # Node.js Backend (Modular V2)
+│   ├── server.js                     # Main server entry point (Port 3001)
 │   ├── start-server.js               # Server launcher with auto-restart
+│   ├── routes/                       # API route handlers
+│   │   ├── matlab.js                 # MATLAB control endpoints
+│   │   ├── variables.js              # Variable configuration
+│   │   ├── groundPlane.js            # Ground plane updates
+│   │   ├── gnd.js                    # GND file upload/validation
+│   │   ├── optimization.js           # Optimization data management
+│   │   └── results.js                # Results processing
+│   ├── services/                     # Business logic services
+│   │   ├── processManager.js         # MATLAB process lifecycle
+│   │   ├── websocketManager.js       # Real-time WebSocket server
+│   │   └── excelReader.js            # Excel operations with retry
+│   ├── middleware/                   # Express middleware
+│   │   └── validation.js             # Request validation
+│   ├── config/                       # Configuration
+│   │   ├── constants.js              # Server constants & timeouts
+│   │   └── logger.js                 # Winston logger setup
+│   ├── utils/                        # Helper functions
+│   │   └── helpers.js                # Error sanitization, validation
+│   ├── logs/                         # Server logs (auto-generated)
+│   ├── uploads/gnd_files/            # Uploaded DXF files
+│   ├── v1_archived/                  # Legacy monolithic server
+│   │   ├── matlab-server.js          # Original 3200-line server
+│   │   └── README.md                 # Archive documentation
 │   └── server.pid                    # Process ID file
 │
 ├── OPEN_THIS/                        # Setup System
@@ -94,6 +117,20 @@ fyp_project_current/
 ├── .gitignore                        # Git exclusions
 └── README.md                         # Quick start guide
 ```
+
+### Server Architecture (V2 - Current)
+
+The backend uses a **modular architecture** with separated concerns:
+
+**Key Improvements:**
+- ✅ **Modular structure** - Routes, services, utilities in separate files
+- ✅ **Easy maintenance** - Locate and modify specific functionality quickly
+- ✅ **Scalable** - Add new features without touching existing code
+- ✅ **Better testing** - Isolated components for unit testing
+- ✅ **Consistent error handling** - Standardized response format
+- ✅ **Centralized logging** - Winston with file rotation
+
+**Legacy Note:** The original monolithic server (3265-line `matlab-server.js`) is archived in `server/v1_archived/` for reference.
 
 ---
 
@@ -349,27 +386,37 @@ showAlert('Confirm', 'Proceed with action?', [
 http://YOUR_IP:3001/api
 ```
 
-### Rate Limiting
+### Server Architecture
 
-All API endpoints are protected by rate limiting:
+The API is built with a modular architecture:
+- **Routes** (`server/routes/`) - Endpoint handlers
+- **Services** (`server/services/`) - Business logic
+- **Middleware** (`server/middleware/`) - Validation & error handling
+- **Config** (`server/config/`) - Constants & logging
 
-| Endpoint Type | Limit | Window | Response |
-|--------------|-------|--------|----------|
-| MATLAB execution | 50 requests | 15 minutes | 429 Too Many Requests |
-| File operations | 30 requests | 1 minute | 429 Too Many Requests |
-| File uploads | 10 uploads | 10 minutes | 429 Too Many Requests |
+See [server/README.md](server/README.md) for detailed server documentation.
 
-**Rate Limit Headers:**
-```
-RateLimit-Limit: 30
-RateLimit-Remaining: 25
-RateLimit-Reset: 1704280800
-```
+### Response Format
 
-**Rate Limit Response:**
+All API responses follow a consistent format:
+
+**Success Response:**
 ```json
 {
-  "error": "Too many requests from this IP, please try again later"
+  "success": true,
+  "data": { /* response data */ },
+  "message": "Operation completed successfully",
+  "timestamp": "2026-01-20T12:00:00.000Z"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "error": "Sanitized error details",
+  "timestamp": "2026-01-20T12:00:00.000Z"
 }
 ```
 

@@ -163,67 +163,9 @@ class IntegratedResultsManager:
             return False
 
     def update_integrated_excel(self, iteration=None):
-        """Update integrated Excel file with new data from a specific iteration."""
-        if iteration is None:
-            # No specific iteration - recreate entire file
-            print("   No iteration specified, recreating entire Excel file...")
-            return self.create_integrated_excel()
-        
-        # Incremental update for specific iteration
-        print(f"   Updating Excel with data from iteration {iteration}...")
-        
-        try:
-            # Check if Excel file exists
-            if not self.excel_path.exists():
-                print("   Excel file doesn't exist, creating new one...")
-                return self.create_integrated_excel()
-            
-            # Load existing workbook
-            workbook = load_workbook(self.excel_path)
-            
-            # Scan for the specific iteration CSV files
-            csv_files = self.scan_csv_files()
-            
-            for data_type, files in csv_files.items():
-                # Find files matching the iteration
-                iteration_files = [f for f in files if f['iteration'] == iteration]
-                
-                if not iteration_files:
-                    continue
-                
-                sheet_name = self.data_patterns[data_type]['sheet']
-                value_col_name = self.data_patterns[data_type]['value_col']
-                
-                # Create sheet if it doesn't exist
-                if sheet_name not in workbook.sheetnames:
-                    worksheet = workbook.create_sheet(title=sheet_name)
-                    worksheet.append(['Iteration', 'Frequency_GHz', value_col_name])
-                else:
-                    worksheet = workbook[sheet_name]
-                
-                # Process this iteration's file
-                for file_info in iteration_files:
-                    df = self.read_csv_file(file_info['filepath'])
-                    
-                    if df is not None:
-                        # Append rows for this iteration
-                        for _, row in df.iterrows():
-                            worksheet.append([
-                                iteration,
-                                row['Frequency_GHz'],
-                                row['Value']
-                            ])
-                        print(f"   [{data_type}] Added {len(df)} rows for iteration {iteration}")
-            
-            # Save workbook
-            workbook.save(self.excel_path)
-            print(f"   ✅ Excel file updated for iteration {iteration}")
-            return True
-            
-        except Exception as e:
-            print(f"[ERROR] Error updating Excel for iteration {iteration}: {str(e)}")
-            print("   Falling back to full recreation...")
-            return self.create_integrated_excel()
+        """Update integrated Excel file with new data."""
+        # For now, just recreate the entire file
+        return self.create_integrated_excel()
 
     def clear_integrated_excel(self):
         """Clear/delete the integrated Excel file."""

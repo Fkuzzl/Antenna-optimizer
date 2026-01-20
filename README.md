@@ -73,11 +73,30 @@ This will terminate all Node.js processes (server and Expo).
 
 ```
 ├── app/                    # React Native frontend
-├── server/                 # Node.js backend (Express + WebSocket)
+│   ├── index.jsx          # Home page and navigation
+│   ├── app_config.js      # Centralized configuration
+│   ├── MatlabProjectRunner.jsx    # MATLAB execution interface
+│   ├── AntennaVariableSelector.jsx # Variable selection
+│   ├── GroundPlaneConfigurator.jsx # Ground plane setup
+│   └── SimulationResultsViewer.jsx # Results display
+├── server/                 # Node.js backend (Modular V2 Architecture)
+│   ├── server.js          # Main server entry point
+│   ├── routes/            # API endpoints (matlab, variables, gnd, etc.)
+│   ├── services/          # Business logic (WebSocket, process, Excel)
+│   ├── middleware/        # Validation and error handling
+│   ├── config/            # Constants and logger configuration
+│   ├── utils/             # Helper functions
+│   └── v1_archived/       # Legacy monolithic server (reference only)
 ├── scripts/                # Python utilities
+│   ├── generate_f_model.py         # Generate F_Model_Element.m
+│   ├── update_excel_incremental.py # Excel processing
+│   └── gnd_importer/      # DXF geometry parser
 ├── config/                 # Variable definitions (78 parameters)
+│   └── antenna_variables.json
 ├── OPEN_THIS/SETUP/        # Auto-setup wizard
-└── test_files/             # Sample DXF files
+│   ├── quick_setup.js     # Interactive setup
+│   └── requirements.txt   # Python dependencies
+└── test_files/dxf/         # Sample DXF files for testing
 ```
 
 ## Troubleshooting
@@ -110,13 +129,16 @@ pip install -r OPEN_THIS/SETUP/requirements.txt
   - WebSocket protocol
   - Performance metrics
   - Advanced configuration
+- **[server/README.md](server/README.md)** - Server architecture and API endpoints
+- **[EXCEL_UPDATE_GUIDE.md](EXCEL_UPDATE_GUIDE.md)** - Excel processing guide
+- **[PAGINATION_TEST_GUIDE.md](PAGINATION_TEST_GUIDE.md)** - Pagination testing
 
 ## Technology Stack
 
 - **Frontend**: React Native 0.81.4 + Expo ~54.0.10
-- **Backend**: Node.js + Express 5.1.0
+- **Backend**: Node.js + Express 5.1.0 (Modular V2 Architecture)
 - **Real-time**: WebSocket (ws 8.18.3)
-- **Data Processing**: Python 3.8+ (pandas, openpyxl)
+- **Data Processing**: Python 3.8+ (pandas, openpyxl, ezdxf, shapely)
 - **Optimization**: MATLAB R2020b+ + HFSS 2022 R2
 
 ## Author
