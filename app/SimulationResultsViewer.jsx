@@ -153,21 +153,21 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       
       if (result.success) {
         // If we wanted the last page, load it now
-        if (page === 'last' && result.totalPages > 1) {
+        if (page === 'last' && result.data.totalPages > 1) {
           // Recursive call to load the actual last page
-          await loadPage(result.totalPages);
+          await loadPage(result.data.totalPages);
           return;
         }
         
         setSimulationResults(result.data);
-        setCurrentPage(result.page);
-        setTotalPages(result.totalPages);
-        setHasMore(result.hasMore);
+        setCurrentPage(result.data.page);
+        setTotalPages(result.data.totalPages);
+        setHasMore(result.data.hasMore);
         
         // Show which iterations are displayed
         const firstIter = result.data.iterations[0]?.iteration || 0;
         const lastIter = result.data.iterations[result.data.iterations.length - 1]?.iteration || 0;
-        showAlert('Success', `Page ${result.page} of ${result.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
+        showAlert('Success', `Page ${result.data.page} of ${result.data.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
       } else {
         showAlert('Error', result.message);
       }

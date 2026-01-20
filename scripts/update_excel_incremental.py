@@ -78,50 +78,39 @@ def read_csv_standardized(filepath):
     
     return None
 
-def append_iteration_to_excel(excel_path, data_path, iteration):
-    """Append a single iteration's data to Excel."""
+def append_iteration_to_excel(wb, data_path, iteration):
+    """Append a single iteration's data to an already-opened workbook."""
     data_configs = {
         'S11': {'pattern': f'S11_{iteration}.csv', 'sheet': 'S11_Data', 'col': 'S11_dB'},
         'AR': {'pattern': f'AR_{iteration}.csv', 'sheet': 'AR_Data', 'col': 'AR'},
         'Gain': {'pattern': f'Gain_{iteration}.csv', 'sheet': 'Gain_Data', 'col': 'Gain_dBi'}
     }
     
-    wb = None
-    try:
-        wb = load_workbook(excel_path)
+    for data_type, config in data_configs.items():
+        csv_file = Path(data_path) / config['pattern']
         
-        for data_type, config in data_configs.items():
-            csv_file = Path(data_path) / config['pattern']
-            
-            if not csv_file.exists():
-                continue
-            
-            df = read_csv_standardized(csv_file)
-            if df is None:
-                continue
-            
-            # Add iteration column
-            df['Iteration'] = iteration
-            df = df.rename(columns={'Value': config['col']})
-            df = df[['Iteration', 'Frequency_GHz', config['col']]]
-            
-            # Get or create sheet
-            if config['sheet'] not in wb.sheetnames:
-                ws = wb.create_sheet(config['sheet'])
-                ws.append(['Iteration', 'Frequency_GHz', config['col']])
-            else:
-                ws = wb[config['sheet']]
-            
-            # Append rows
-            for _, row in df.iterrows():
-                ws.append([row['Iteration'], row['Frequency_GHz'], row[config['col']]])
+        if not csv_file.exists():
+            continue
         
-        wb.save(excel_path)
-    except Exception as e:
-        raise e
-    finally:
-        if wb:
-            wb.close()
+        df = read_csv_standardized(csv_file)
+        if df is None:
+            continue
+        
+        # Add iteration column
+        df['Iteration'] = iteration
+        df = df.rename(columns={'Value': config['col']})
+        df = df[['Iteration', 'Frequency_GHz', config['col']]]
+        
+        # Get or create sheet
+        if config['sheet'] not in wb.sheetnames:
+            ws = wb.create_sheet(config['sheet'])
+            ws.append(['Iteration', 'Frequency_GHz', config['col']])
+        else:
+            ws = wb[config['sheet']]
+        
+        # Append rows
+        for _, row in df.iterrows():
+            ws.append([row['Iteration'], row['Frequency_GHz'], row[config['col']]])
 
 def update_excel_incremental(project_path):
     """Main update function - finds and appends all missing iterations."""
@@ -146,15 +135,32 @@ def update_excel_incremental(project_path):
     
     print(f"Found {len(missing_iterations)} missing iterations: {missing_iterations[0]}-{missing_iterations[-1]}")
     
-    # Append each iteration
-    for i, iteration in enumerate(missing_iterations, 1):
-        try:
-            print(f"   [{i}/{len(missing_iterations)}] Adding iteration {iteration}...", end=" ")
-            append_iteration_to_excel(excel_path, data_path, iteration)
-            print("[OK]")
-        except Exception as e:
-            print(f"[ERROR] {e}")
-            return False
+    # Open Excel once, add all iterations, save once
+    wb = None
+    try:
+        wb = load_workbook(excel_path)
+        
+        # Append each iteration to the open workbook
+        for i, iteration in enumerate(missing_iterations, 1):
+            try:
+                print(f"   [{i}/{len(missing_iterations)}] Adding iteration {iteration}...", end=" ")
+                append_iteration_to_excel(wb, data_path, iteration)
+                print("[OK]")
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                return False
+        
+        # Save once at the end
+        print("Saving Excel file...", end=" ")
+        wb.save(excel_path)
+        print("[OK]")
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to update Excel: {e}")
+        return False
+    finally:
+        if wb:
+            wb.close()
     
     print(f"Excel updated successfully! Now has {missing_iterations[-1]} iterations.")
     return True
