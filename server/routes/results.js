@@ -125,7 +125,7 @@ router.post('/clear', validateProjectPath, async (req, res) => {
         
         logger.info(`Clearing integrated Excel for project: ${projectPath}`);
 
-        const scriptPath = path.join(__dirname, '..', '..', '..', 'scripts', 'integrated_results_manager.py');
+        const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'integrated_results_manager.py');
         const pythonCmd = `python "${scriptPath}" clear --project-path "${projectPath}"`;
 
         exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
