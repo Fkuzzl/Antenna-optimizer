@@ -160,7 +160,9 @@ Units = 'mm';
             else:
                 matlab_content += f"num{current_seed} = Value{current_seed};\n"
             
-            matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',num{current_seed},Units);\n\n"
+            # Use the specific unit from variable definition instead of generic Units
+            units = var_def.get('units', 'mm')
+            matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',num{current_seed},'{units}');\n\n"
         
         current_seed += 1
     
