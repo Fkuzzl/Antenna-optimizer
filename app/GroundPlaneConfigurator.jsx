@@ -583,35 +583,58 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
     const lgxValue = parseFloat(lgx);
     const lgyValue = parseFloat(lgy);
     
+    // HFSS Coordinate System Transformation:
+    // UI: (0,0) at bottom-left, X increases right, Y increases up
+    // HFSS: Top = -X, Bottom = +X, Left = -Y, Right = +Y
+    // Therefore:
+    //   HFSS_X = (lgy - antennaY)  [UI top → HFSS -X, UI bottom → HFSS +X]
+    //   HFSS_Y = antennaX - (lgx/2) [UI left → HFSS -Y, UI right → HFSS +Y, centered]
+    
+    // Actually, simpler interpretation:
+    // HFSS X-axis runs from top (-X) to bottom (+X)
+    // HFSS Y-axis runs from left (-Y) to right (+Y)
+    // So: HFSS_X = lgy - antennaY, HFSS_Y = antennaX
+    
+    const hfss_X = lgyValue - antennaY;  // Flip Y to X: top of UI = small Y = negative X in HFSS
+    const hfss_Y = antennaX;             // UI X directly maps to HFSS Y
+    
     if (mode === 'import' && gndData) {
-      // For imported DXF: Convert canvas coordinates to DXF coordinates
-      // Canvas (0→lgx, 0→lgy) → DXF (min_x→max_x, min_y→max_y)
+      // For imported DXF: Convert canvas coordinates to DXF coordinates, then apply HFSS transform
       const bounds = gndData.bounds;
       const dxfX = bounds.min_x + (antennaX / lgxValue) * bounds.width;
       const dxfY = bounds.min_y + (antennaY / lgyValue) * bounds.height;
       
+      // Apply HFSS coordinate transform to DXF coordinates
+      const hfss_dxf_X = bounds.min_y + bounds.height - (dxfY - bounds.min_y);
+      const hfss_dxf_Y = dxfX;
+      
       console.log(`📍 Antenna position conversion:`);
       console.log(`   Canvas: (${antennaX.toFixed(1)}, ${antennaY.toFixed(1)})`);
       console.log(`   DXF: (${dxfX.toFixed(1)}, ${dxfY.toFixed(1)})`);
+      console.log(`   HFSS: (${hfss_dxf_X.toFixed(1)}, ${hfss_dxf_Y.toFixed(1)})`);
       console.log(`   Bounds: (${bounds.min_x}, ${bounds.min_y}) to (${bounds.max_x}, ${bounds.max_y})`);
       
-      // Apply custom GND configuration with DXF coordinates
+      // Apply custom GND configuration with HFSS-transformed coordinates
       onApply({
         mode: 'custom',
         gndId: gndData.gndId,
         file: gndData.file,
         bounds: gndData.bounds,
-        GND_xPos: dxfX,
-        GND_yPos: dxfY
+        GND_xPos: hfss_dxf_X,
+        GND_yPos: hfss_dxf_Y
       });
     } else {
-      // For parametric mode: Use canvas coordinates directly (they ARE the GND coordinates)
+      // For parametric mode: Apply HFSS coordinate transformation
+      console.log(`📍 Parametric antenna position:`);
+      console.log(`   Canvas: (${antennaX.toFixed(1)}, ${antennaY.toFixed(1)})`);
+      console.log(`   HFSS: (${hfss_X.toFixed(1)}, ${hfss_Y.toFixed(1)})`);
+      
       onApply({
         mode: 'parametric',
         Lgx: lgxValue,
         Lgy: lgyValue,
-        GND_xPos: antennaX,
-        GND_yPos: antennaY
+        GND_xPos: hfss_X,
+        GND_yPos: hfss_Y
       });
     }
   };
@@ -1466,6 +1489,15 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
                 </Text>
               </>
             )}
+            
+            {/* HFSS Coordinate System Info */}
+            <View style={styles.coordinateSystemInfo}>
+              <Text style={styles.coordinateSystemTitle}>📐 HFSS Coordinate System:</Text>
+              <Text style={styles.coordinateSystemText}>• Top (↑) = -X axis</Text>
+              <Text style={styles.coordinateSystemText}>• Bottom (↓) = +X axis</Text>
+              <Text style={styles.coordinateSystemText}>• Left (←) = -Y axis</Text>
+              <Text style={styles.coordinateSystemText}>• Right (→) = +Y axis</Text>
+            </View>
           </View>
         </View>
         
@@ -1632,6 +1664,9 @@ const styles = StyleSheet.create({
   dimensionsDisplay: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, alignItems: 'center' },
   dimensionText: { fontSize: 13, color: '#475569', fontWeight: '600', marginVertical: 2 },
   dimensionHint: { fontSize: 11, color: '#64748b', fontStyle: 'italic', marginTop: 4 },
+  coordinateSystemInfo: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#cbd5e1', width: '100%' },
+  coordinateSystemTitle: { fontSize: 12, fontWeight: '700', color: '#1e293b', marginBottom: 6, textAlign: 'center' },
+  coordinateSystemText: { fontSize: 11, color: '#475569', fontWeight: '500', marginVertical: 2, textAlign: 'left' },
 
   // Button Controls - Navigation and action buttons
   buttonsRow: { flexDirection: 'row', gap: 12 },

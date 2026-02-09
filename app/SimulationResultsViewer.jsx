@@ -164,16 +164,21 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         setTotalPages(result.data.totalPages);
         setHasMore(result.data.hasMore);
         
-        // Show which iterations are displayed
-        const firstIter = result.data.iterations[0]?.iteration || 0;
-        const lastIter = result.data.iterations[result.data.iterations.length - 1]?.iteration || 0;
-        showAlert('Success', `Page ${result.data.page} of ${result.data.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
+        // Check if there are any results
+        if (result.data.summary.totalIterations === 0) {
+          showAlert('No Results', 'No simulation results found. Please run a simulation first to generate data.');
+        } else {
+          // Show which iterations are displayed
+          const firstIter = result.data.iterations[0]?.iteration || 0;
+          const lastIter = result.data.iterations[result.data.iterations.length - 1]?.iteration || 0;
+          showAlert('Success', `Page ${result.data.page} of ${result.data.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
+        }
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
       console.error('Error:', error);
-      showAlert('Error', 'Could not load results. Ensure Excel file exists.');
+      showAlert('Error', 'Could not load results. Make sure simulation has been run and data files exist.');
     } finally {
       setIsLoading(false);
     }

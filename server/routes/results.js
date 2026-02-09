@@ -58,6 +58,7 @@ router.post('/read-page', validateProjectPath, validatePaginationParams, async (
 router.post('/update', validateProjectPath, async (req, res) => {
     try {
         const projectPath = req.validatedProjectPath;
+        const excelPath = path.join(projectPath, FILES.EXCEL_FILENAME);
         
         logger.info(`Updating Excel for project: ${projectPath}`);
 
