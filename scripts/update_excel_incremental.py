@@ -4,11 +4,10 @@ Simple incremental Excel updater - handles multiple missing iterations
 Checks Excel file, finds missing iterations from CSV files, and appends them.
 """
 
-import os
 import sys
 import pandas as pd
 from pathlib import Path
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 import re
 import argparse
 
@@ -122,18 +121,42 @@ def update_excel_incremental(project_path):
         print(f"[ERROR] Data path not found: {data_path}")
         return False
     
+    # Check if Excel file exists, create if not
+    if not excel_path.exists():
+        # Silently create the Excel file
+        try:
+            wb = Workbook()
+            wb.remove(wb.active)  # Remove default sheet
+            
+            # Create empty sheets with headers
+            data_configs = {
+                'S11_Data': 'S11_dB',
+                'AR_Data': 'AR',
+                'Gain_Data': 'Gain_dBi'
+            }
+            
+            for sheet_name, value_col in data_configs.items():
+                ws = wb.create_sheet(sheet_name)
+                ws.append(['Iteration', 'Frequency_GHz', value_col])
+            
+            wb.save(excel_path)
+            wb.close()
+            print(f"Created Excel file with structure")
+        except Exception as e:
+            print(f"[ERROR] Failed to create Excel file: {e}")
+            return False
+    
     # Get current state
     last_excel_iter = get_last_iteration_in_excel(excel_path)
-    print(f"Excel has iterations up to: {last_excel_iter}")
     
     # Find missing iterations
     missing_iterations = find_csv_iterations(data_path, last_excel_iter)
     
     if not missing_iterations:
-        print("Excel is up to date!")
+        print("Results up to date")
         return True
     
-    print(f"Found {len(missing_iterations)} missing iterations: {missing_iterations[0]}-{missing_iterations[-1]}")
+    print(f"Processing {len(missing_iterations)} iterations")
     
     # Open Excel once, add all iterations, save once
     wb = None
@@ -143,17 +166,13 @@ def update_excel_incremental(project_path):
         # Append each iteration to the open workbook
         for i, iteration in enumerate(missing_iterations, 1):
             try:
-                print(f"   [{i}/{len(missing_iterations)}] Adding iteration {iteration}...", end=" ")
                 append_iteration_to_excel(wb, data_path, iteration)
-                print("[OK]")
             except Exception as e:
                 print(f"[ERROR] {e}")
                 return False
         
         # Save once at the end
-        print("Saving Excel file...", end=" ")
         wb.save(excel_path)
-        print("[OK]")
         
     except Exception as e:
         print(f"[ERROR] Failed to update Excel: {e}")
@@ -162,7 +181,7 @@ def update_excel_incremental(project_path):
         if wb:
             wb.close()
     
-    print(f"Excel updated successfully! Now has {missing_iterations[-1]} iterations.")
+    print(f"Results loaded successfully - {missing_iterations[-1]} total iterations")
     return True
 
 if __name__ == "__main__":

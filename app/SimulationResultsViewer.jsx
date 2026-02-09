@@ -69,16 +69,21 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
     loadTimeRef.current = Date.now();
   };
 
-  const updateExcelFromCSV = async () => {
+  const refreshLatestResults = async () => {
+    setIsLoading(true);
+    resetTimer();
+    
     try {
       const projectDir = getProjectDirectory();
       if (!projectDir) {
         showAlert('Error', 'Project path not available.');
-        return false;
+        setIsLoading(false);
+        return;
       }
 
-      console.log('🔄 Updating Excel from CSV files...');
+      console.log('🔄 Loading results from CSV files...');
       
+      // Update/create Excel from CSV files
       const response = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,39 +92,26 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
 
       const result = await response.json();
       
-      if (result.success) {
-        console.log('✅ Excel updated:', result.output);
-        return true;
-      } else {
-        console.error('❌ Update failed:', result.message);
-        showAlert('Update Failed', result.message || 'Could not update Excel file');
-        return false;
+      if (!result.success) {
+        console.error('❌ Failed to prepare results:', result.message);
+        showAlert('Error', 'Could not load results. Please ensure simulation data exists.');
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('❌ Update error:', error);
-      showAlert('Error', 'Could not connect to server for update');
-      return false;
-    }
-  };
 
-  const refreshLatestResults = async () => {
-    setIsLoading(true);
-    resetTimer();
-    
-    // First update Excel from CSV
-    const updated = await updateExcelFromCSV();
-    
-    if (updated) {
+      console.log('✅ Results prepared:', result.output);
+      
       // Wait a moment for file to be fully written and closed
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Then load the latest page
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Now load the latest page
       await loadPage('last');
-    } else {
-      // Even if update fails, try to load existing data
-      await loadPage('last');
+      
+    } catch (error) {
+      console.error('❌ Error:', error);
+      showAlert('Error', 'Could not connect to server. Please check if the server is running.');
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const loadPage = async (page = 'last') => {
@@ -174,11 +166,14 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
           showAlert('Success', `Page ${result.data.page} of ${result.data.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
         }
       } else {
-        showAlert('Error', result.message);
+        showAlert('Error', result.message || 'Could not load results.');
       }
     } catch (error) {
       console.error('Error:', error);
-      showAlert('Error', 'Could not load results. Make sure simulation has been run and data files exist.');
+      // Only show error if we're not in the middle of initial load
+      if (simulationResults.iterations.length === 0) {
+        showAlert('Error', 'Could not load results. Click "Refresh Latest Results" to try again.');
+      }
     } finally {
       setIsLoading(false);
     }
