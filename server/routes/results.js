@@ -54,6 +54,7 @@ router.post('/read-page', validateProjectPath, validatePaginationParams, async (
 /**
  * POST /api/integrated-results/update
  * Update Excel file with missing iterations from CSV files
+ * If Excel doesn't exist, creates it with all data. Otherwise, appends new iterations only.
  */
 router.post('/update', validateProjectPath, async (req, res) => {
     try {
@@ -62,9 +63,22 @@ router.post('/update', validateProjectPath, async (req, res) => {
         
         logger.info(`Updating Excel for project: ${projectPath}`);
 
-        // Run Python script to update Excel
-        const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update_excel_incremental.py');
-        const pythonCmd = `python "${scriptPath}" --project-path "${projectPath}"`;
+        // Check if Excel file exists
+        const excelExists = fs.existsSync(excelPath);
+        
+        let scriptPath, pythonCmd;
+        
+        if (!excelExists) {
+            // Excel doesn't exist - create it with all CSV data
+            logger.info('Excel file not found, creating with all data...');
+            scriptPath = path.join(__dirname, '..', '..', 'scripts', 'integrated_results_manager.py');
+            pythonCmd = `python "${scriptPath}" create --project-path "${projectPath}"`;
+        } else {
+            // Excel exists - incrementally append new iterations
+            logger.info('Excel file exists, appending new iterations...');
+            scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update_excel_incremental.py');
+            pythonCmd = `python "${scriptPath}" --project-path "${projectPath}"`;
+        }
 
         exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
             if (error) {
@@ -73,7 +87,8 @@ router.post('/update', validateProjectPath, async (req, res) => {
             }
 
             logger.info(`Update output: ${stdout}`);
-            res.json(createResponse(true, { output: stdout }, 'Excel updated successfully'));
+            const action = excelExists ? 'updated' : 'created';
+            res.json(createResponse(true, { output: stdout, action }, `Excel ${action} successfully`));
         });
 
     } catch (error) {

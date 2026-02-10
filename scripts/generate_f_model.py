@@ -67,18 +67,18 @@ def generate_f_model_element(variable_ids):
     # Sort IDs to ensure consistent ordering
     ids.sort()
     
-    # Separate optimization variables from custom variables (ground plane) and material variables
-    optimization_ids = [vid for vid in ids if not VARIABLE_DEFINITIONS[vid].get('custom', False) and VARIABLE_DEFINITIONS[vid].get('category') != 'material']
-    custom_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('custom', False)]
+    # Separate optimization variables from non-optimizable variables (ground_plane, locked) and material variables
+    optimization_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') == 'standard']
+    non_optimizable_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') in ['ground_plane', 'locked']]
     material_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') == 'material']
     
-    # Note: Ground plane variables (83-86) are NO LONGER automatically included
+    # Note: Ground plane variables are NO LONGER automatically included
     # They will only be added if user explicitly selects/configures them via the UI
     # The update-ground-plane endpoint will add them to the file if user configures ground plane
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    has_ground_plane = any(vid in [83, 84, 85, 86] for vid in custom_ids)
+    has_ground_plane = any(VARIABLE_DEFINITIONS[vid].get('category') == 'ground_plane' for vid in non_optimizable_ids)
     has_material_vars = len(material_ids) > 0
     ground_plane_note = "included (user configured)" if has_ground_plane else "not included"
     material_note = f"included ({len(material_ids)} material properties)" if has_material_vars else "not included"
@@ -110,7 +110,10 @@ Units = 'mm';
     # Map standard variables
     for var_id in optimization_ids:
         var_def = VARIABLE_DEFINITIONS[var_id]
-        matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {var_def['name']:15s} | Original: {var_def['formula']}\n"
+        # Generate formula dynamically from multiplier and offset
+        offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
+        formula = f"{var_def['multiplier']}*seed({var_id}){offset_str}"
+        matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {var_def['name']:15s} | Formula: {formula}\n"
         current_seed += 1
     
     # Map material variables
@@ -118,7 +121,10 @@ Units = 'mm';
         var_def = VARIABLE_DEFINITIONS[var_id]
         material_name = var_def.get('material_name', 'unknown')
         property_name = var_def.get('material_property', 'unknown')
-        matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {material_name}.{property_name:10s} | Original: {var_def['formula']}\n"
+        # Generate formula dynamically
+        offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
+        formula = f"{var_def['multiplier']}*seed({var_id}){offset_str}"
+        matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {material_name}.{property_name:10s} | Formula: {formula}\n"
         current_seed += 1
     
     matlab_content += "\n"
@@ -133,8 +139,10 @@ Units = 'mm';
         
         # Handle special variables (1-6) with old naming style
         if is_special:
-            # Add original formula as comment for special variables
-            matlab_content += f"% Original: {var_def['formula']}\n"
+            # Generate formula dynamically
+            offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
+            formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
+            matlab_content += f"% Formula: {formula}\n"
             
             # Get the custom variable name
             var_name = var_def.get('var_name', f'var{current_seed}')
@@ -148,8 +156,10 @@ Units = 'mm';
             matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',{var_name},'{units}')\n\n"
         else:
             # Standard variables with modern naming
-            # Add original formula as comment
-            matlab_content += f"% Original: {var_def['formula']}\n"
+            # Generate formula dynamically
+            offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
+            formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
+            matlab_content += f"% Formula: {formula}\n"
             
             # Generate new formula with reassigned seed
             offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
@@ -170,9 +180,11 @@ Units = 'mm';
     for var_id in material_ids:
         var_def = VARIABLE_DEFINITIONS[var_id]
         
-        # Add original formula as comment
+        # Generate formula dynamically
+        offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
+        formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
         matlab_content += f"% Material Property: {var_def['name']} - {var_def['description']}\n"
-        matlab_content += f"% Original: {var_def['formula']}\n"
+        matlab_content += f"% Formula: {formula}\n"
         
         # Get material properties
         material_name = var_def.get('material_name', 'unknown')
@@ -193,24 +205,33 @@ Units = 'mm';
         
         current_seed += 1
     
-    # Add custom variables (ground plane parameters) with placeholder values
-    # These will be updated by the update-ground-plane endpoint
+    # Add non-optimizable variables (ground plane parameters, locked variables) with placeholder values
+    # Ground plane variables will be updated by the update-ground-plane endpoint
+    # Locked variables are display-only, not optimized
     # IMPORTANT: GND_xPos and GND_yPos represent the CENTER of the 25x25mm antenna
-    for var_id in custom_ids:
+    for var_id in non_optimizable_ids:
         var_def = VARIABLE_DEFINITIONS[var_id]
-        matlab_content += f"% Custom variable: {var_def['name']} - {var_def['formula']}\n"
+        var_category = var_def.get('category', 'unknown')
         
-        # Set default values for ground plane parameters
-        if var_id == 83:  # Lgx
+        # Only process ground_plane variables (skip locked variables)
+        if var_category != 'ground_plane':
+            continue
+            
+        matlab_content += f"% Ground plane variable: {var_def['name']}\n"
+        
+        # Set default values for ground plane parameters based on variable name
+        var_name = var_def['name']
+        
+        if var_name == 'Lgx':
             matlab_content += f"Lgx = 25;  % Ground plane length X (mm) - default/will be updated by UI\n"
             matlab_content += f"hfssChangeVar(fid,'Lgx',Lgx,'mm');\n\n"
-        elif var_id == 84:  # Lgy
+        elif var_name == 'Lgy':
             matlab_content += f"Lgy = 25;  % Ground plane length Y (mm) - default/will be updated by UI\n"
             matlab_content += f"hfssChangeVar(fid,'Lgy',Lgy,'mm');\n\n"
-        elif var_id == 85:  # GND_xPos
+        elif var_name == 'GND_xPos':
             matlab_content += f"GND_xPos = 12.5;  % Antenna X center position (mm) - default/will be updated by UI\n"
             matlab_content += f"hfssChangeVar(fid,'GND_xPos',GND_xPos,'mm');\n\n"
-        elif var_id == 86:  # GND_yPos
+        elif var_name == 'GND_yPos':
             matlab_content += f"GND_yPos = 12.5;  % Antenna Y center position (mm) - default/will be updated by UI\n"
             matlab_content += f"hfssChangeVar(fid,'GND_yPos',GND_yPos,'mm');\n\n"
     

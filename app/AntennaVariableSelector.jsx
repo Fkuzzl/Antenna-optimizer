@@ -95,10 +95,10 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         const result = await response.json();
 
         if (result.success && result.variables) {
-          // Filter: Keep all optimizable variables (standard + material), exclude only ground_plane
-          // Ground plane variables are configured separately via Ground Plane Configurator
+          // Filter: Keep only optimizable variables (standard + material)
+          // Exclude ground_plane (configured separately) and locked (display-only)
           const selectableVariables = result.variables.filter(v => 
-            !v.custom && v.category !== 'ground_plane'
+            v.category === 'standard' || v.category === 'material'
           );
           
           // Transform to match UI format
@@ -449,13 +449,40 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               }
             } else {
               // Parametric GND - update F_Model_Element.m with ground plane variables
-              console.log(`🔧 Applying user-configured ground plane:`);
+              // IMPORTANT: Clear F_GND_Import.m to prevent conflicts with old custom GND config
+              console.log(`🔧 Applying parametric ground plane (clearing old custom GND if exists):`);
               console.log(`   Lgx: ${groundPlaneConfig.Lgx}`);
               console.log(`   Lgy: ${groundPlaneConfig.Lgy}`);
               console.log(`   GND_xPos: ${groundPlaneConfig.GND_xPos}`);
               console.log(`   GND_yPos: ${groundPlaneConfig.GND_yPos}`);
               console.log(`   Project path: ${projectPath}`);
               
+              // Step 1: Clear F_GND_Import.m (parametric mode doesn't use custom GND import)
+              try {
+                const clearGndResponse = await tryFetchWithMultipleUrls('/api/matlab/generate-gnd-import', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    mode: 'clear',
+                    projectPath: projectPath
+                  }),
+                });
+
+                const clearGndResult = await clearGndResponse.json();
+                
+                if (clearGndResult.success) {
+                  console.log(`✅ F_GND_Import.m cleared (parametric mode)`);
+                } else {
+                  console.log(`⚠️ Failed to clear F_GND_Import.m: ${clearGndResult.message}`);
+                }
+              } catch (clearError) {
+                console.log(`⚠️ Failed to clear F_GND_Import.m: ${clearError.message}`);
+                // Non-critical - continue with ground plane update
+              }
+              
+              // Step 2: Update F_Model_Element.m with parametric ground plane parameters
               const groundPlaneResponse = await tryFetchWithMultipleUrls('/api/matlab/update-ground-plane', {
                 method: 'POST',
                 headers: {
@@ -470,7 +497,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               const groundPlaneResult = await groundPlaneResponse.json();
               
               if (groundPlaneResult.success) {
-                console.log(`✅ Ground plane updated successfully:`);
+                console.log(`✅ Parametric ground plane updated successfully:`);
                 console.log(`   ${JSON.stringify(groundPlaneResult.parameters)}`);
               } else {
                 console.log(`⚠️ Ground plane update failed: ${groundPlaneResult.message}`);

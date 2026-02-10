@@ -81,9 +81,11 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         return;
       }
 
-      console.log('🔄 Loading results from CSV files...');
+      console.log('🔄 Updating results from simulation data...');
       
-      // Update/create Excel from CSV files
+      // Server will check if Excel exists:
+      // - If not: creates Excel with all CSV data
+      // - If yes: appends only new iterations
       const response = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,13 +95,14 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       const result = await response.json();
       
       if (!result.success) {
-        console.error('❌ Failed to prepare results:', result.message);
-        showAlert('Error', 'Could not load results. Please ensure simulation data exists.');
+        console.error('❌ Failed to update results:', result.message);
+        showAlert('Error', 'Could not load simulation results. Please ensure optimization has been run and data files exist.');
         setIsLoading(false);
         return;
       }
 
-      console.log('✅ Results prepared:', result.output);
+      const action = result.data?.action || 'updated';
+      console.log(`✅ Excel file ${action} successfully`);
       
       // Wait a moment for file to be fully written and closed
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -125,6 +128,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       const projectDir = getProjectDirectory();
       if (!projectDir) {
         showAlert('Error', 'Project path not available.');
+        setIsLoading(false);
         return;
       }
 
@@ -139,7 +143,20 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         body: JSON.stringify({ projectPath: projectDir, page: targetPage, pageSize: 100 })
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        // Handle HTTP errors (404, 500, etc.)
+        const errorResult = await response.json().catch(() => ({}));
+        
+        if (response.status === 404 || errorResult.message?.includes('not found')) {
+          showAlert('Excel File Not Found', 'The Excel file was not found or has been deleted. Please click "🔄 Update Results" to regenerate it from simulation data.');
+        } else if (response.status === 503) {
+          showAlert('File Locked', 'Excel file is being updated. Please wait a moment and try again.');
+        } else {
+          showAlert('Error', errorResult.message || `Server error: ${response.status}`);
+        }
+        setIsLoading(false);
+        return;
+      }
 
       const result = await response.json();
       
@@ -159,20 +176,23 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         // Check if there are any results
         if (result.data.summary.totalIterations === 0) {
           showAlert('No Results', 'No simulation results found. Please run a simulation first to generate data.');
-        } else {
-          // Show which iterations are displayed
-          const firstIter = result.data.iterations[0]?.iteration || 0;
-          const lastIter = result.data.iterations[result.data.iterations.length - 1]?.iteration || 0;
-          showAlert('Success', `Page ${result.data.page} of ${result.data.totalPages}\nShowing iterations ${firstIter}-${lastIter}\n(Total: ${result.data.summary.totalIterations})`);
         }
       } else {
-        showAlert('Error', result.message || 'Could not load results.');
+        // Excel file not found - inform user to click "Update Results"
+        if (result.message?.includes('not found') || result.message?.includes('Excel file')) {
+          showAlert('Excel File Not Found', 'The Excel file was not found. Please click "🔄 Update Results" to generate it from simulation data.');
+        } else {
+          showAlert('Error', result.message || 'Could not load results.');
+        }
       }
     } catch (error) {
-      console.error('Error:', error);
-      // Only show error if we're not in the middle of initial load
-      if (simulationResults.iterations.length === 0) {
-        showAlert('Error', 'Could not load results. Click "Refresh Latest Results" to try again.');
+      console.error('Error loading page:', error);
+      
+      // Network errors (server not running, connection refused, etc.)
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        showAlert('Connection Error', 'Could not connect to server. Please check if the server is running on port 3001.');
+      } else {
+        showAlert('Error', `Could not load results: ${error.message}`);
       }
     } finally {
       setIsLoading(false);
@@ -295,11 +315,18 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
           )}
         </View>
 
+        {/* Update Results Button - Always Visible */}
+        <TouchableOpacity onPress={refreshLatestResults} style={styles.refreshLatestButton} disabled={isLoading}>
+          <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']} style={styles.refreshLatestGradient}>
+            <Text style={styles.refreshLatestText}>{isLoading ? '⏳ Updating...' : '🔄 Update Results from CSV'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* Load Button */}
         {simulationResults.iterations.length === 0 && (
           <TouchableOpacity onPress={() => loadPage('last')} style={styles.actionButton} disabled={isLoading}>
             <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#3b82f6', '#1d4ed8']} style={styles.actionButtonGradient}>
-              <Text style={styles.actionButtonText}>{isLoading ? '⏳ Loading...' : '📥 Load Latest Results'}</Text>
+              <Text style={styles.actionButtonText}>{isLoading ? '⏳ Loading...' : '📥 Load from Excel File'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -335,15 +362,6 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               <Text style={[styles.pageButtonText, (currentPage >= totalPages || !hasMore || isLoading) && styles.pageButtonTextDisabled]}>Next →</Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {/* Refresh Latest Button */}
-        {simulationResults.iterations.length > 0 && (
-          <TouchableOpacity onPress={refreshLatestResults} style={styles.refreshLatestButton} disabled={isLoading}>
-            <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']} style={styles.refreshLatestGradient}>
-              <Text style={styles.refreshLatestText}>{isLoading ? '⏳ Refreshing...' : '🔄 Refresh Latest Results'}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         )}
 
         {/* Results */}

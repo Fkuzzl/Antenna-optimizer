@@ -121,30 +121,11 @@ def update_excel_incremental(project_path):
         print(f"[ERROR] Data path not found: {data_path}")
         return False
     
-    # Check if Excel file exists, create if not
+    # Check if Excel file exists
     if not excel_path.exists():
-        # Silently create the Excel file
-        try:
-            wb = Workbook()
-            wb.remove(wb.active)  # Remove default sheet
-            
-            # Create empty sheets with headers
-            data_configs = {
-                'S11_Data': 'S11_dB',
-                'AR_Data': 'AR',
-                'Gain_Data': 'Gain_dBi'
-            }
-            
-            for sheet_name, value_col in data_configs.items():
-                ws = wb.create_sheet(sheet_name)
-                ws.append(['Iteration', 'Frequency_GHz', value_col])
-            
-            wb.save(excel_path)
-            wb.close()
-            print(f"Created Excel file with structure")
-        except Exception as e:
-            print(f"[ERROR] Failed to create Excel file: {e}")
-            return False
+        print(f"[ERROR] Excel file not found: {excel_path}")
+        print("[INFO] Please use the full creation script first")
+        return False
     
     # Get current state
     last_excel_iter = get_last_iteration_in_excel(excel_path)
