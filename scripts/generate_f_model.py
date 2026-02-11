@@ -67,10 +67,9 @@ def generate_f_model_element(variable_ids):
     # Sort IDs to ensure consistent ordering
     ids.sort()
     
-    # Separate optimization variables from non-optimizable variables (ground_plane, locked) and material variables
+    # Separate optimization variables from non-optimizable variables (ground_plane, locked)
     optimization_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') == 'standard']
     non_optimizable_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') in ['ground_plane', 'locked']]
-    material_ids = [vid for vid in ids if VARIABLE_DEFINITIONS[vid].get('category') == 'material']
     
     # Note: Ground plane variables are NO LONGER automatically included
     # They will only be added if user explicitly selects/configures them via the UI
@@ -79,19 +78,15 @@ def generate_f_model_element(variable_ids):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     has_ground_plane = any(VARIABLE_DEFINITIONS[vid].get('category') == 'ground_plane' for vid in non_optimizable_ids)
-    has_material_vars = len(material_ids) > 0
     ground_plane_note = "included (user configured)" if has_ground_plane else "not included"
-    material_note = f"included ({len(material_ids)} material properties)" if has_material_vars else "not included"
     
-    # Total optimizable variables includes both standard and material variables
-    total_opt_vars = len(optimization_ids) + len(material_ids)
+    # Total optimizable variables (only standard category)
+    total_opt_vars = len(optimization_ids)
     
     matlab_content = f"""function F_Model_Element(fid, seed, Units)
 % Generated automatically by F_Model_Element Generator
 % Timestamp: {timestamp}
-% Selected variables: {total_opt_vars} out of 78 available (IDs may be non-sequential)
-%   - Standard variables: {len(optimization_ids)}
-%   - Material variables: {len(material_ids)}
+% Selected variables: {total_opt_vars} standard variables (IDs may be non-sequential)
 % Ground plane parameters: {ground_plane_note}
 % Seed reassignment: 1 to {total_opt_vars}
 % Variable definitions loaded from: config/antenna_variables.json
@@ -116,17 +111,6 @@ Units = 'mm';
         matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {var_def['name']:15s} | Formula: {formula}\n"
         current_seed += 1
     
-    # Map material variables
-    for var_id in material_ids:
-        var_def = VARIABLE_DEFINITIONS[var_id]
-        material_name = var_def.get('material_name', 'unknown')
-        property_name = var_def.get('material_property', 'unknown')
-        # Generate formula dynamically
-        offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
-        formula = f"{var_def['multiplier']}*seed({var_id}){offset_str}"
-        matlab_content += f"% ID {var_id:2d} -> seed({current_seed:2d}) -> {material_name}.{property_name:10s} | Formula: {formula}\n"
-        current_seed += 1
-    
     matlab_content += "\n"
     
     # Generate variable assignments with seed reassignment (standard variables)
@@ -134,74 +118,23 @@ Units = 'mm';
     for var_id in optimization_ids:
         var_def = VARIABLE_DEFINITIONS[var_id]
         
-        # Check if this is a special variable (category == 'special')
-        is_special = var_def.get('category') == 'special'
-        
-        # Handle special variables (1-6) with old naming style
-        if is_special:
-            # Generate formula dynamically
-            offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
-            formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
-            matlab_content += f"% Formula: {formula}\n"
-            
-            # Get the custom variable name
-            var_name = var_def.get('var_name', f'var{current_seed}')
-            units = var_def.get('units', 'mm')
-            
-            if var_def.get('precision') is None:  # Variable 6 (brown) - no rounding
-                matlab_content += f"{var_name} = {var_def['multiplier']}*seed({current_seed}){var_def['offset']:+g};\n"
-            else:
-                matlab_content += f"{var_name} = round({var_def['multiplier']}*seed({current_seed}){var_def['offset']:+g},{var_def['precision']});\n"
-            
-            matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',{var_name},'{units}')\n\n"
-        else:
-            # Standard variables with modern naming
-            # Generate formula dynamically
-            offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
-            formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
-            matlab_content += f"% Formula: {formula}\n"
-            
-            # Generate new formula with reassigned seed
-            offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
-            matlab_content += f"Value{current_seed} = {var_def['multiplier']}*seed({current_seed}){offset_str};\n"
-            
-            if var_def.get('precision') is not None:
-                matlab_content += f"num{current_seed} = round(Value{current_seed}, {var_def['precision']});\n"
-            else:
-                matlab_content += f"num{current_seed} = Value{current_seed};\n"
-            
-            # Use the specific unit from variable definition instead of generic Units
-            units = var_def.get('units', 'mm')
-            matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',num{current_seed},'{units}');\n\n"
-        
-        current_seed += 1
-    
-    # Generate material property assignments
-    for var_id in material_ids:
-        var_def = VARIABLE_DEFINITIONS[var_id]
-        
         # Generate formula dynamically
         offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
         formula = f"{var_def['multiplier']}*seed({current_seed}){offset_str}"
-        matlab_content += f"% Material Property: {var_def['name']} - {var_def['description']}\n"
         matlab_content += f"% Formula: {formula}\n"
-        
-        # Get material properties
-        material_name = var_def.get('material_name', 'unknown')
-        property_name = var_def.get('material_property', 'permittivity')
-        var_name = var_def.get('var_name', f'mat{current_seed}')
-        units = var_def.get('units', '')
         
         # Generate new formula with reassigned seed
         offset_str = f"{var_def['offset']:+g}" if var_def['offset'] != 0 else ""
-        matlab_content += f"{var_name} = {var_def['multiplier']}*seed({current_seed}){offset_str};\n"
+        matlab_content += f"Value{current_seed} = {var_def['multiplier']}*seed({current_seed}){offset_str};\n"
         
-        # Apply rounding if specified
         if var_def.get('precision') is not None:
-            matlab_content += f"{var_name} = round({var_name}, {var_def['precision']});\n"
+            matlab_content += f"num{current_seed} = round(Value{current_seed}, {var_def['precision']});\n"
+        else:
+            matlab_content += f"num{current_seed} = Value{current_seed};\n"
         
-        # Use hfssChangeMaterialProperty to modify material property
-        matlab_content += f"hfssChangeMaterialProperty(fid, '{material_name}', '{property_name}', {var_name}, '{units}');\n\n"
+        # Use the specific unit from variable definition instead of generic Units
+        units = var_def.get('units', 'mm')
+        matlab_content += f"hfssChangeVar(fid,'{var_def['name']}',num{current_seed},'{units}');\n\n"
         
         current_seed += 1
     
@@ -273,11 +206,10 @@ def main():
         matlab_content = generate_f_model_element(variable_ids_str)
         variable_count = len([x for x in variable_ids_str.split(',') if x.strip()])
         
-        # Count custom and material variables for reporting
+        # Count ground plane variables for reporting
         ids_list = [int(x.strip()) for x in variable_ids_str.split(',') if x.strip()]
-        custom_count = sum(1 for vid in ids_list if VARIABLE_DEFINITIONS.get(vid, {}).get('custom', False))
-        material_count = sum(1 for vid in ids_list if VARIABLE_DEFINITIONS.get(vid, {}).get('category') == 'material')
-        optimization_count = variable_count - custom_count
+        ground_plane_count = sum(1 for vid in ids_list if VARIABLE_DEFINITIONS.get(vid, {}).get('category') == 'ground_plane')
+        optimization_count = variable_count - ground_plane_count
         
         # Create Function/HFSS directory if it doesn't exist
         function_hfss_dir = os.path.join(project_root, 'Function', 'HFSS')
@@ -331,10 +263,9 @@ def main():
         print(f"F_Model_Element.m generated successfully")
         print(f"Output file: {output_file}")
         print(f"Total variables selected: {variable_count}")
-        print(f"Optimization variables: {optimization_count - material_count}")
-        print(f"Material variables: {material_count}")
-        print(f"Custom variables (ground plane): {custom_count}")
-        print(f"Seed range: 1-{optimization_count + material_count}")
+        print(f"Optimization variables: {optimization_count}")
+        print(f"Ground plane variables: {ground_plane_count}")
+        print(f"Seed range: 1-{optimization_count}")
         
     except Exception as e:
         print(f"Error: {str(e)}")

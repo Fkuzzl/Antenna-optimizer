@@ -95,10 +95,10 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
         const result = await response.json();
 
         if (result.success && result.variables) {
-          // Filter: Keep only optimizable variables (standard + material)
+          // Filter: Keep only optimizable variables (standard)
           // Exclude ground_plane (configured separately) and locked (display-only)
           const selectableVariables = result.variables.filter(v => 
-            v.category === 'standard' || v.category === 'material'
+            v.category === 'standard'
           );
           
           // Transform to match UI format
@@ -121,8 +121,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
           setAntennaVariables(transformedVariables);
           console.log(`✅ Loaded ${transformedVariables.length} optimizable variables (all optimized by default)`);
           console.log(`   Standard variables: ${transformedVariables.filter(v => v.category === 'standard').length}`);
-          console.log(`   Material variables: ${transformedVariables.filter(v => v.category === 'material').length}`);
-          console.log(`   (Ground plane variables excluded - configured separately)`);
+          console.log(`   (Ground plane and locked variables excluded - configured/fixed separately)`);
         } else {
           throw new Error(result.message || 'Failed to load variables');
         }
@@ -581,8 +580,8 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
     }
   };
 
-  // Show all optimizable variables (standard + material, exclude ground_plane)
-  const designVariables = antennaVariables.filter(v => !v.custom);
+  // Show all optimizable variables (only standard category)
+  const designVariables = antennaVariables;
 
   // Show loading state
   if (isLoadingVariables) {

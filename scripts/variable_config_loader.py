@@ -90,7 +90,7 @@ class VariableConfig:
         Get all variables in a specific category.
         
         Args:
-            category: Category name (e.g., 'standard', 'special', 'ground_plane')
+            category: Category name (e.g., 'standard', 'locked', 'ground_plane')
             
         Returns:
             List of variables in the specified category
