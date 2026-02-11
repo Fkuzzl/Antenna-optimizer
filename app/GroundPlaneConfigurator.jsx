@@ -1010,9 +1010,9 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
   
   const renderModeSelection = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Choose Ground Plane Type</Text>
+      <Text style={styles.stepTitle}>Step 1: Choose Ground Plane Design Method</Text>
       <Text style={styles.stepDescription}>
-        Select how you want to define the ground plane for your antenna simulation.
+        The ground plane is the metal surface behind your antenna. Choose how to define its shape:
       </Text>
       
       <TouchableOpacity 
@@ -1026,16 +1026,15 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
           colors={['#f59e0b', '#f97316']}
           style={styles.modeCardGradient}
         >
-          <Text style={styles.modeIcon}>🏗️</Text>
-          <Text style={styles.modeTitle}>Parametric Ground Plane</Text>
+          <Text style={styles.modeIcon}>📏</Text>
+          <Text style={styles.modeTitle}>Simple Rectangle</Text>
           <Text style={styles.modeDescription}>
-            Define a rectangular ground plane by entering length and width dimensions.
-            Best for simple designs and quick testing.
+            Create a basic rectangular ground plane by entering width and height. Perfect for standard designs and quick experiments.
           </Text>
           <View style={styles.modeFeatures}>
-            <Text style={styles.modeFeature}>✓ Quick setup</Text>
-            <Text style={styles.modeFeature}>✓ Rectangle only</Text>
-            <Text style={styles.modeFeature}>✓ Interactive positioning</Text>
+            <Text style={styles.modeFeature}>✓ Easy - just enter 2 numbers</Text>
+            <Text style={styles.modeFeature}>✓ Rectangle shape only</Text>
+            <Text style={styles.modeFeature}>✓ Drag to position antenna</Text>
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -1051,16 +1050,15 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
           colors={['#6366f1', '#8b5cf6']}
           style={styles.modeCardGradient}
         >
-          <Text style={styles.modeIcon}>📐</Text>
-          <Text style={styles.modeTitle}>Import Custom GND</Text>
+          <Text style={styles.modeIcon}>�</Text>
+          <Text style={styles.modeTitle}>Import CAD File (DXF)</Text>
           <Text style={styles.modeDescription}>
-            Upload a CAD file (DXF, STL, VBScript) of your real-world PCB or device housing.
-            Best for accurate simulations with complex shapes.
+            Upload a DXF drawing of your actual PCB or device shape. Use this for realistic simulations with complex outlines, holes, or cutouts.
           </Text>
           <View style={styles.modeFeatures}>
-            <Text style={styles.modeFeature}>✓ Any 2D shape</Text>
-            <Text style={styles.modeFeature}>✓ DXF format only</Text>
-            <Text style={styles.modeFeature}>✓ Real-world accuracy</Text>
+            <Text style={styles.modeFeature}>✓ Any 2D shape or polygon</Text>
+            <Text style={styles.modeFeature}>✓ DXF files only (from AutoCAD/FreeCAD)</Text>
+            <Text style={styles.modeFeature}>✓ Matches real hardware</Text>
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -1069,9 +1067,9 @@ export default function GroundPlaneConfigurator({ onBack, onApply, projectPath }
   
   const renderImportStep = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Import Custom Ground Plane</Text>
+      <Text style={styles.stepTitle}>Step 2: Upload Your DXF File</Text>
       <Text style={styles.stepDescription}>
-        Upload a DXF file of your ground plane design (max 50MB). Supports lines, polylines, circles, arcs, and complex 2D shapes.
+        Select a 2D DXF drawing file (max 50MB). The file should contain the outline of your ground plane shape. Minimum size: 25mm x 25mm.
       </Text>
       
       {/* Hidden file input for web */}

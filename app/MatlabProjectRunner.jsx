@@ -1308,8 +1308,8 @@ export default function MatlabProjectRunner({ onBack }) {
               />
             </LinearGradient>
             <View style={styles.titleTexts}>
-              <Text style={styles.title}>MATLAB Studio</Text>
-              <Text style={styles.subtitle}>Execute & monitor optimization projects</Text>
+              <Text style={styles.title}>MATLAB Optimizer Control</Text>
+              <Text style={styles.subtitle}>Launch scripts, monitor progress, control execution</Text>
             </View>
           </View>
           
@@ -1325,24 +1325,19 @@ export default function MatlabProjectRunner({ onBack }) {
                   />
                 </View>
                 
-                {/* Server Status Card */}
                 <View style={styles.headerStatusTexts}>
-                  <Text style={styles.headerStatusTitle}>Server</Text>
-                  <Text style={[styles.headerStatusValue,
-                    serverStatus.includes('Connected') && !serverStatus.includes('⚠️') ? styles.statusConnected :
-                    serverStatus.includes('⚠️') ? styles.statusWarning : styles.statusError
-                  ]}>
+                  <Text style={styles.headerStatusTitle}>SERVER (PC)</Text>
+                  <Text style={styles.headerStatusValue}>
                     {serverStatus.split(' - ')[0]}
                   </Text>
-
                 </View>
               </View>
             </View>
 
-            <View style={styles.headerStatusCard}>
-              <View style={[styles.headerStatusContent, 
-                executionState?.isRunning ? styles.headerStatusRunning : styles.headerStatusReady
-              ]}>
+            <View style={[styles.headerStatusCard, 
+              executionState?.isRunning ? styles.headerStatusRunning : styles.headerStatusReady
+            ]}>
+              <View style={styles.headerStatusContent}>
                 <View style={styles.headerStatusIconContainer}>
                   {executionState?.isRunning ? (
                     <Image 
@@ -1359,9 +1354,9 @@ export default function MatlabProjectRunner({ onBack }) {
                   )}
                 </View>
                 <View style={styles.headerStatusTexts}>
-                  <Text style={styles.headerStatusTitle}>MATLAB</Text>
+                  <Text style={styles.headerStatusTitle}>EXECUTION</Text>
                   <Text style={styles.headerStatusValue}>
-                    {executionState?.isRunning ? 'Running' : 'Ready'}
+                    {executionState?.isRunning ? 'Running' : 'Idle'}
                   </Text>
                 </View>
               </View>
@@ -1740,7 +1735,7 @@ export default function MatlabProjectRunner({ onBack }) {
             <View style={styles.guideHeaderTexts}>
               <Text style={styles.guideTitle}>Quick Start Guide</Text>
               <Text style={styles.guideSubtitle}>
-                {showQuickGuide ? 'Tap to collapse' : 'Tap to view 4 easy steps'}
+                {showQuickGuide ? 'Tap to collapse' : 'Learn how to launch MATLAB in 4 easy steps'}
               </Text>
             </View>
             <Text style={styles.guideToggleIcon}>
@@ -1756,9 +1751,10 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>1</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>📁 Select Project File</Text>
+                    <Text style={styles.guideStepTitle}>📁 Enter Project File Path</Text>
                     <Text style={styles.guideStepDescription}>
-                      Enter the path to your MATLAB Live Script (.mlx) file in the input field above
+                      Type or paste the full path to your MATLAB Live Script (.mlx) file.{' \n'}
+                      💡 Tip: Use the History button to access previously used paths
                     </Text>
                   </View>
                 </View>
@@ -1768,9 +1764,9 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>2</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>🚀 Launch Execution</Text>
+                    <Text style={styles.guideStepTitle}>✅ Confirm & Launch</Text>
                     <Text style={styles.guideStepDescription}>
-                      Click the Launch button to start MATLAB and automatically execute your Live Script
+                      Click "Confirm Location" to validate your file, then press "Launch" to start MATLAB and run your script automatically
                     </Text>
                   </View>
                 </View>
@@ -1780,9 +1776,9 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>3</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>👀 Monitor Progress</Text>
+                    <Text style={styles.guideStepTitle}>� Monitor Real-Time Progress</Text>
                     <Text style={styles.guideStepDescription}>
-                      Watch MATLAB GUI and HFSS processes in real-time through the status cards
+                      Watch the status cards above update live as your optimization runs. You'll see iteration counts, HFSS processes, and execution status
                     </Text>
                   </View>
                 </View>
@@ -1792,27 +1788,28 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>4</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>⏹️ Control Execution</Text>
+                    <Text style={styles.guideStepTitle}>⏹️ Control & Stop</Text>
                     <Text style={styles.guideStepDescription}>
-                      Use Stop button to interrupt execution or let MATLAB continue for manual use
+                      Press "Stop" to gracefully terminate MATLAB when needed, or let it continue running for manual control
                     </Text>
                   </View>
                 </View>
               </View>
 
               <View style={styles.guideFeatures}>
-                <Text style={styles.guideFeaturesTitle}>Key Features</Text>
+                <Text style={styles.guideFeaturesTitle}>Key Capabilities</Text>
                 <View style={styles.guideFeaturesList}>
-                  <Text style={styles.guideFeature}>🖥️ Visible MATLAB GUI for monitoring</Text>
-                  <Text style={styles.guideFeature}>⚡ Real-time HFSS process tracking</Text>
-                  <Text style={styles.guideFeature}>🎛️ Graceful execution control</Text>
+                  <Text style={styles.guideFeature}>🖥️ Visual MATLAB window - see exactly what's running</Text>
+                  <Text style={styles.guideFeature}>📈 Real-time iteration tracking and results</Text>
+                  <Text style={styles.guideFeature}>⚡ HFSS process monitoring during simulations</Text>
+                  <Text style={styles.guideFeature}>🎛️ Remote control - start, stop, and manage from anywhere</Text>
                 </View>
               </View>
               
               <View style={styles.guideNote}>
                 <Text style={styles.guideNoteIcon}>💡</Text>
                 <Text style={styles.guideNoteText}>
-                  MATLAB Studio provides full visibility and control over automatic Live Script execution with integrated HFSS monitoring
+                  Remote Control: Once launched, you can monitor your optimization from anywhere while MATLAB runs on your PC. Perfect for long simulations - check progress from your phone without being at your desk!
                 </Text>
               </View>
             </>
@@ -1936,17 +1933,17 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#ffffff', marginBottom: 2 },
   subtitle: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)' },
   
-  // Header Status Styles
-  headerStatusOverview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, gap: 16, paddingHorizontal: 8 },
-  headerStatusCard: { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)', flex: 1, shadowColor: 'rgba(0, 0, 0, 0.1)', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  // Header Status Styles - Horizontal layout with proper padding from borders
+  headerStatusOverview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, gap: 14, paddingHorizontal: 4 },
+  headerStatusCard: { backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.4)', flex: 1, shadowColor: 'rgba(0, 0, 0, 0.15)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 5, minHeight: 85 },
   headerStatusContent: { flexDirection: 'row', alignItems: 'center' },
-  headerStatusRunning: { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' },
-  headerStatusReady: { backgroundColor: 'rgba(100, 116, 139, 0.1)', borderColor: 'rgba(100, 116, 139, 0.3)' },
-  headerStatusIconContainer: { width: 28, height: 28, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
-  headerStatusIcon: { width: 22, height: 22 },
-  headerStatusTexts: { alignItems: 'flex-start', flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 8, padding: 8, marginHorizontal: 2, minHeight: 45, justifyContent: 'center' },
-  headerStatusTitle: { fontSize: 11, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  headerStatusValue: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+  headerStatusRunning: { backgroundColor: 'rgba(251, 191, 36, 0.25)', borderColor: 'rgba(255, 255, 255, 0.6)', borderWidth: 2.5 },
+  headerStatusReady: { backgroundColor: 'rgba(255, 255, 255, 0.18)', borderColor: 'rgba(255, 255, 255, 0.35)', borderWidth: 2 },
+  headerStatusIconContainer: { width: 50, height: 50, marginRight: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.3)', borderRadius: 12 },
+  headerStatusIcon: { width: 32, height: 32 },
+  headerStatusTexts: { alignItems: 'flex-start', flex: 1 },
+  headerStatusTitle: { fontSize: 11, color: 'rgba(255, 255, 255, 0.85)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 },
+  headerStatusValue: { fontSize: 20, fontWeight: '800', color: '#ffffff', letterSpacing: 0.3, textShadowColor: 'rgba(0, 0, 0, 0.2)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   autoManagerIndicator: { fontSize: 13, fontWeight: '600', color: '#F59E0B', textAlign: 'center' },
   wsStatsText: { fontSize: 9, fontWeight: '600', color: '#4CAF50', marginTop: 1, textShadowColor: 'rgba(76, 175, 80, 0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   

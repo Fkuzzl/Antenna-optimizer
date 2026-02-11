@@ -50,7 +50,7 @@ const HomePage = () => {
             resizeMode="contain"
           />
           <Text style={styles.appTitle}>Antenna Optimizer</Text>
-          <Text style={styles.appSubtitle}>Visible GUI • Auto Execute • Real-time Monitor</Text>
+          <Text style={styles.appSubtitle}>Control MATLAB simulations • Monitor HFSS processes • View results in real-time</Text>
           
           {/* Status Indicators */}
           <View style={styles.statusRow}>
@@ -99,8 +99,8 @@ const HomePage = () => {
                     />
                   </View>
                   <View style={styles.primaryCardTexts}>
-                    <Text style={styles.primaryCardTitle}>MATLAB Antenna Optimizer</Text>
-                    <Text style={styles.primaryCardSubtitle}>Launch optimization workspace</Text>
+                    <Text style={styles.primaryCardTitle}>Run Antenna Optimization</Text>
+                    <Text style={styles.primaryCardSubtitle}>Execute MATLAB Live Scripts and monitor HFSS simulations</Text>
                   </View>
                   <View style={styles.primaryCardArrow}>
                     <Text style={styles.primaryCardArrowText}>→</Text>
@@ -108,9 +108,9 @@ const HomePage = () => {
                 </View>
                 
                 <View style={styles.primaryCardFeatures}>
-                  <Text style={styles.primaryCardFeature}>✨ Live Script Execution</Text>
-                  <Text style={styles.primaryCardFeature}>📈 HFSS Integration</Text>
-                  <Text style={styles.primaryCardFeature}>🎛️ Process Control</Text>
+                  <Text style={styles.primaryCardFeature}>✨ Visual MATLAB UI</Text>
+                  <Text style={styles.primaryCardFeature}>📈 Track Iterations</Text>
+                  <Text style={styles.primaryCardFeature}>🎛️ Start/Stop Control</Text>
                 </View>
               </View>
             </LinearGradient>
@@ -140,7 +140,7 @@ const HomePage = () => {
                   </LinearGradient>
                 </View>
                 <Text style={styles.secondaryCardTitle}>Configuration</Text>
-                <Text style={styles.secondaryCardDescription}>View server and system settings</Text>
+                <Text style={styles.secondaryCardDescription}>Server connection & system paths</Text>
               </LinearGradient>
             </TouchableOpacity>
             
@@ -162,7 +162,7 @@ const HomePage = () => {
                   </LinearGradient>
                 </View>
                 <Text style={styles.secondaryCardTitle}>About</Text>
-                <Text style={styles.secondaryCardDescription}>App information & support</Text>
+                <Text style={styles.secondaryCardDescription}>Features, version, & how to use</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

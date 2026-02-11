@@ -70,8 +70,8 @@ const SettingsPage = ({ onBack }) => {
               <Text style={styles.headerIconText}>⚙️</Text>
             </LinearGradient>
           </View>
-          <Text style={styles.title}>Configuration</Text>
-          <Text style={styles.subtitle}>View system settings and server configuration</Text>
+          <Text style={styles.title}>System Configuration</Text>
+          <Text style={styles.subtitle}>Connection settings and file paths - configured during initial setup</Text>
         </View>
       </LinearGradient>
 
@@ -97,7 +97,7 @@ const SettingsPage = ({ onBack }) => {
             <>
               <InfoItem
                 icon="🌐"
-                label="Server Address"
+                label="Server Address (PC IP)"
                 value={serverConfig?.host || 'localhost'}
               />
               
@@ -133,9 +133,11 @@ const SettingsPage = ({ onBack }) => {
               <Text style={styles.infoText}>
                 System paths are configured in:{'\n'}
                 OPEN_THIS/SETUP/setup_variable.json{'\n\n'}
-                • MATLAB installation path{'\n'}
-                • Python executable path{'\n'}
-                • Project directories
+                Contains:{' \n'}
+                • MATLAB installation path (where MATLAB.exe is located){'\n'}
+                • Python executable path (for processing scripts){'\n'}
+                • Project directories (where optimization files are stored){'\n\n'}
+                To update: Run OPEN_THIS/run_setup.bat
               </Text>
             </View>
           </View>

@@ -55,8 +55,8 @@ const AboutPage = ({ onBack }) => {
               />
             </LinearGradient>
           </View>
-          <Text style={styles.title}>MATLAB Studio</Text>
-          <Text style={styles.subtitle}>Advanced antenna optimization with MATLAB Live Scripts and HFSS integration</Text>
+          <Text style={styles.title}>Antenna Optimizer</Text>
+          <Text style={styles.subtitle}>Remote control interface for MATLAB antenna optimization projects with HFSS electromagnetic simulation</Text>
           
           <View style={styles.headerVersionInfo}>
             <Text style={styles.headerVersionText}>Version 1.1.0</Text>
@@ -81,20 +81,20 @@ const AboutPage = ({ onBack }) => {
           
           <FeatureItem
             icon="🖥️"
-            title="Visible MATLAB GUI"
-            description="Execute Live Scripts with full visibility and real-time monitoring"
+            title="Visual MATLAB Interface"
+            description="Run MATLAB Live Scripts with visible GUI window on your PC - see exactly what MATLAB is doing during optimization"
           />
           
           <FeatureItem
             icon="⚡"
-            title="Automatic Execution"
-            description="One-click launch with automated script execution and process tracking"
+            title="One-Click Execution"
+            description="Start optimizations instantly from your phone/tablet - the app automatically launches MATLAB and runs your selected script"
           />
           
           <FeatureItem
             icon="📊"
-            title="Real-time Monitoring"
-            description="Live status updates, execution tracking, and HFSS process monitoring"
+            title="Live Progress Tracking"
+            description="Watch iteration counts update in real-time as your antenna designs are simulated and optimized by HFSS"
           />
           
           <FeatureItem
