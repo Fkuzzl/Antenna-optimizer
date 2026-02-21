@@ -24,10 +24,10 @@
       "id": 2,
       "name": "purple",
       "description": "Patch-side rectangle, Impedance matching",
-      "multiplier": 0.7,
-      "offset": 0.8,
+      "multiplier": 0.95,
+      "offset": 1.05,
       "precision": 3,
-      "range": "[0.1, 1.5]",
+      "range": "[0.1, 2]",
       "units": "mm",
       "category": "standard"
     },
@@ -44,10 +44,10 @@
       "id": 4,
       "name": "ngreen",
       "description": "L3, L4 half-sphere cut",
-      "multiplier": 0.15,
-      "offset": 0.25,
+      "multiplier": 0.1,
+      "offset": 0.3,
       "precision": 3,
-      "range": "[0.1, 0.4]",
+      "range": "[0.2, 0.4]",
       "units": "mm",
       "category": "standard"
     },
@@ -57,10 +57,10 @@
       "description": "L1 arm angle",
       "multiplier": 40,
       "offset": 50,
-      "precision": 2,
+      "precision": 1,
       "range": "[10, 90]",
       "units": "deg",
-      "category": "standard"
+      "category": "locked"
     },
     {
       "id": 6,
@@ -68,10 +68,10 @@
       "description": "L2 arm angle",
       "multiplier": 40,
       "offset": 50,
-      "precision": 2,
+      "precision": 1,
       "range": "[10, 90]",
       "units": "deg",
-      "category": "standard"
+      "category": "locked"
     },
     {
       "id": 7,
@@ -79,7 +79,7 @@
       "description": "L3 arm angle",
       "multiplier": 40,
       "offset": 50,
-      "precision": 2,
+      "precision": 1,
       "range": "[10, 90]",
       "units": "deg",
       "category": "standard"
@@ -90,7 +90,7 @@
       "description": "L4 arm angle",
       "multiplier": 40,
       "offset": 50,
-      "precision": 2,
+      "precision": 1,
       "range": "[10, 90]",
       "units": "deg",
       "category": "standard"
@@ -99,10 +99,10 @@
       "id": 9,
       "name": "brown",
       "description": "T-strip to t-strip Gap",
-      "multiplier": 0.9,
-      "offset": 1.1,
+      "multiplier": 0.625,
+      "offset": 0.875,
       "precision": 3,
-      "range": "[0.2, 2]",
+      "range": "[0.25, 1.5]",
       "units": "mm",
       "category": "standard"
     },
