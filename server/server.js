@@ -16,6 +16,7 @@ const logger = require('./config/logger');
 // Services
 const websocketManager = require('./services/websocketManager');
 const processManager = require('./services/processManager');
+const progressiveTuningManager = require('./services/progressiveTuningManager');
 
 // Middleware
 const { errorHandler } = require('./middleware/validation');
@@ -27,6 +28,7 @@ const variablesRoutes = require('./routes/variables');
 const groundPlaneRoutes = require('./routes/groundPlane');
 const optimizationRoutes = require('./routes/optimization');
 const gndRoutes = require('./routes/gnd');
+const progressiveTuningRoutes = require('./routes/progressiveTuning');
 
 // Initialize Express app
 const app = express();
@@ -90,6 +92,7 @@ app.use('/api/variables', variablesRoutes);
 app.use('/api/matlab', groundPlaneRoutes);
 app.use('/api/matlab', optimizationRoutes);
 app.use('/api/gnd', gndRoutes);
+app.use('/api/progressive-tuning', progressiveTuningRoutes);
 
 // Initialize WebSocket server
 websocketManager.initialize(httpServer);
@@ -139,6 +142,13 @@ const gracefulShutdown = async (signal) => {
         await processManager.stopMatlabProcess();
     } catch (error) {
         logger.error('Error stopping MATLAB during shutdown', { error: error.message });
+    }
+    
+    // Stop progressive tuning
+    try {
+        progressiveTuningManager.cleanup();
+    } catch (error) {
+        logger.error('Error stopping progressive tuning during shutdown', { error: error.message });
     }
     
     // Close HTTP server

@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
 const processManager = require('../services/processManager');
+const progressiveTuningManager = require('../services/progressiveTuningManager');
 const websocketManager = require('../services/websocketManager');
 const { createResponse } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
@@ -204,11 +205,13 @@ router.get('/status', async (req, res) => {
  */
 router.post('/run', async (req, res) => {
     try {
-        const { filePath } = req.body;
+        const { projectPath, filePath: legacyFilePath } = req.body;
+        const rawInput = projectPath || legacyFilePath;
+        const inputPath = rawInput ? path.normalize(rawInput.trim()) : null;
 
-        if (!filePath) {
+        if (!inputPath) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json(
-                createResponse(false, null, 'File path is required')
+                createResponse(false, null, 'Project path is required')
             );
         }
 
@@ -220,20 +223,46 @@ router.post('/run', async (req, res) => {
             );
         }
 
-        // Extract file info
-        const fileName = path.basename(filePath);
-        const fileDir = path.dirname(filePath);
-        const matlabDir = fileDir.replace(/\\/g, '/');
-        const matlabFilePath = filePath.replace(/\\/g, '/');
-
-        // Check if file exists
-        if (!fs.existsSync(filePath)) {
+        if (!fs.existsSync(inputPath)) {
+            logger.warn(`[matlab/run] Path not found. Raw: "${path.normalize((projectPath||legacyFilePath||'').trim())}", Normalized: "${inputPath}"`);
             return res.status(HTTP_STATUS.NOT_FOUND).json(
-                createResponse(false, null, `File not found: ${fileName}`)
+                createResponse(false, null, `Path not found: ${inputPath}`)
             );
         }
 
-        logger.info(`Starting MATLAB script: ${fileName}`);
+        // Resolve script file: if directory, scan for .mlx or .m
+        // Priority: Main_*.mlx > any *.mlx > Main_*.m > any *.m
+        let scriptFile;
+        const inputStat = fs.statSync(inputPath);
+        if (inputStat.isDirectory()) {
+            const entries = fs.readdirSync(inputPath);
+            const mlxFiles = entries.filter(f => f.toLowerCase().endsWith('.mlx'));
+            const mFiles   = entries.filter(f => f.toLowerCase().endsWith('.m') && !f.startsWith('.'));
+
+            const mainMlx = mlxFiles.find(f => f.toLowerCase().startsWith('main_'));
+            const mainM   = mFiles.find(f => f.toLowerCase().startsWith('main_'));
+            const found   = mainMlx || mlxFiles[0] || mainM || mFiles[0];
+
+            if (!found) {
+                return res.status(HTTP_STATUS.NOT_FOUND).json(
+                    createResponse(false, null, 'No .mlx or .m script file found in project directory')
+                );
+            }
+            scriptFile = path.join(inputPath, found);
+            logger.info(`[matlab/run] Selected script: ${found} (from ${mlxFiles.length} .mlx, ${mFiles.length} .m files)`);
+        } else {
+            scriptFile = inputPath;
+        }
+
+        const resolvedProjectPath = inputStat.isDirectory() ? inputPath : path.dirname(inputPath);
+
+        // Extract file info
+        const fileName = path.basename(scriptFile);
+        const fileDir  = path.dirname(scriptFile);
+        const matlabDir      = fileDir.replace(/\\/g, '/');
+        const matlabFilePath = scriptFile.replace(/\\/g, '/');
+
+        logger.info(`Starting MATLAB script: ${fileName} from ${resolvedProjectPath}`);
 
         // MATLAB command
         const matlabCommand = `cd('${matlabDir}'); open('${matlabFilePath}'); pause(2); run('${matlabFilePath}'); disp('=== EXECUTION COMPLETED ===');`;
@@ -245,8 +274,9 @@ router.post('/run', async (req, res) => {
             cwd: fileDir,
             metadata: {
                 fileName,
-                filePath,
-                fileDir
+                filePath: scriptFile,
+                fileDir,
+                projectPath: resolvedProjectPath
             }
         });
 
@@ -292,11 +322,17 @@ router.post('/run', async (req, res) => {
 
 /**
  * POST /api/matlab/stop
- * Stop MATLAB execution and terminate all related processes
+ * Unified stop endpoint for both MOEA tuning and Progressive Tuning.
+ * Force-terminates all MATLAB and HFSS processes, then resets both
+ * the MOEA process manager and the Progressive Tuning manager.
  */
 router.post('/stop', async (req, res) => {
     try {
+        // Hard kill for both MOEA and Progressive Tuning
         logger.info('Stop request - terminating processes...');
+        if (progressiveTuningManager.isRunning()) {
+            logger.info('[Stop] Progressive Tuning was active — will hard-kill and reset manager');
+        }
         
         // Get current MATLAB and HFSS processes
         const currentMatlabProcesses = await getMatlabProcesses();
@@ -377,7 +413,8 @@ router.post('/stop', async (req, res) => {
         
         // Reset execution state
         processManager.reset();
-        
+        progressiveTuningManager.reset();
+
         // Broadcast status change to all connected clients
         websocketManager.broadcast({
             type: 'status',
@@ -450,37 +487,47 @@ router.get('/check', (req, res) => {
  */
 router.post('/check-file', (req, res) => {
     try {
-        const { filePath } = req.body;
+        const { projectPath, filePath: legacyFilePath } = req.body;
+        const inputPath = projectPath || legacyFilePath;
 
-        if (!filePath) {
+        if (!inputPath) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
                 success: false,
-                message: 'File path is required'
+                message: 'Project path or file path is required'
             });
         }
 
-        logger.info(`Checking if file exists: ${filePath}`);
+        logger.info(`Checking project files in: ${inputPath}`);
 
-        // Check if directory exists first
-        const dirExists = fs.existsSync(path.dirname(filePath));
-        
-        // Check for both .m and .mlx files
+        // Determine if input is a directory or a file path
         let mFilePath, mlxFilePath;
-        
-        if (filePath.endsWith('.m')) {
-            mFilePath = filePath;
-            mlxFilePath = filePath.slice(0, -2) + '.mlx';
-        } else if (filePath.endsWith('.mlx')) {
-            mlxFilePath = filePath;
-            mFilePath = filePath.slice(0, -4) + '.m';
+        let dirExists = false;
+
+        if (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory()) {
+            // Directory mode: scan for any .mlx / .m file
+            dirExists = true;
+            const entries = fs.readdirSync(inputPath);
+            const foundMlx = entries.find(f => f.toLowerCase().endsWith('.mlx'));
+            const foundM   = entries.find(f => f.toLowerCase().endsWith('.m') && !f.startsWith('.'));
+            mlxFilePath = foundMlx ? path.join(inputPath, foundMlx) : null;
+            mFilePath   = foundM   ? path.join(inputPath, foundM)   : null;
         } else {
-            // No extension, add both
-            mFilePath = filePath + '.m';
-            mlxFilePath = filePath + '.mlx';
+            // Legacy file-path mode
+            dirExists = fs.existsSync(path.dirname(inputPath));
+            if (inputPath.endsWith('.m')) {
+                mFilePath   = inputPath;
+                mlxFilePath = inputPath.slice(0, -2) + '.mlx';
+            } else if (inputPath.endsWith('.mlx')) {
+                mlxFilePath = inputPath;
+                mFilePath   = inputPath.slice(0, -4) + '.m';
+            } else {
+                mFilePath   = inputPath + '.m';
+                mlxFilePath = inputPath + '.mlx';
+            }
         }
-        
-        const mExists = fs.existsSync(mFilePath);
-        const mlxExists = fs.existsSync(mlxFilePath);
+
+        const mExists   = mFilePath   ? fs.existsSync(mFilePath)   : false;
+        const mlxExists = mlxFilePath ? fs.existsSync(mlxFilePath) : false;
         const exists = mExists || mlxExists;
         
         const fileInfo = {
@@ -512,10 +559,12 @@ router.post('/check-file', (req, res) => {
             // Debug: List directory contents if directory exists
             if (dirExists) {
                 try {
-                    const dirContents = fs.readdirSync(path.dirname(filePath));
+                    const debugDir = fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory()
+                        ? inputPath : path.dirname(inputPath);
+                    const dirContents = fs.readdirSync(debugDir);
                     logger.info(`Directory contents (${dirContents.length} items)`, {
-                        directory: path.dirname(filePath),
-                        files: dirContents.slice(0, 20) // Log first 20 items
+                        directory: debugDir,
+                        files: dirContents.slice(0, 20)
                     });
                 } catch (dirError) {
                     logger.error('Could not list directory', { error: dirError.message });
@@ -531,22 +580,6 @@ router.post('/check-file', (req, res) => {
             success: false,
             error: error.message
         });
-    }
-});
-
-/**
- * POST /api/matlab/reset
- * Reset MATLAB execution state
- */
-router.post('/reset', (req, res) => {
-    try {
-        processManager.reset();
-        res.json(createResponse(true, null, 'Process state reset'));
-    } catch (error) {
-        logger.error('Error resetting state', { error: error.message });
-        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
-            createResponse(false, null, 'Failed to reset state')
-        );
     }
 });
 

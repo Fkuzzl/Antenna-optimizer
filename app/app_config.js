@@ -152,22 +152,37 @@ export const PathUtils = {
 };
 
 /**
- * Unified alert utility for consistent alerts across web and mobile
- * Replaces window.alert on web with proper Alert.alert for better UX
+ * Unified alert utility for consistent alerts across web and mobile.
+ * 
+ * When the InAppModal system is active (via registerModalHandler), all alerts
+ * are routed to the styled in-app modal. Otherwise falls back to native
+ * Alert.alert / window.alert for safety.
+ * 
  * @param {string} title - Alert title
  * @param {string} message - Alert message
  * @param {Array} buttons - Array of button objects with text and onPress (optional)
+ * @param {Object} options - Extra options: { type: 'info'|'success'|'error'|'warning' }
  */
-export const showAlert = (title, message, buttons = [{ text: 'OK' }]) => {
+
+// Global handler — set by ModalProvider at mount time
+let _modalHandler = null;
+
+export const registerModalHandler = (handler) => {
+  _modalHandler = handler;
+};
+
+export const showAlert = (title, message, buttons = [{ text: 'OK' }], options = {}) => {
+  // If InAppModal is registered, route everything through it
+  if (_modalHandler) {
+    _modalHandler(title, message, buttons, options);
+    return;
+  }
+
+  // Fallback (pre-mount or in tests)
   if (Platform.OS === 'web') {
-    // For web, construct a formatted message
     const fullMessage = `${title}\n\n${message}`;
-    
-    // If we have multiple buttons or a cancel button, use confirm()
     if (buttons.length > 1 || buttons.some(b => b.style === 'cancel')) {
       const confirmed = window.confirm(fullMessage);
-      
-      // Find and call the appropriate button handler
       if (confirmed) {
         const okButton = buttons.find(b => b.style !== 'cancel') || buttons[0];
         if (okButton.onPress) okButton.onPress();
@@ -176,12 +191,10 @@ export const showAlert = (title, message, buttons = [{ text: 'OK' }]) => {
         if (cancelButton && cancelButton.onPress) cancelButton.onPress();
       }
     } else {
-      // Simple alert with OK button
       window.alert(fullMessage);
       if (buttons[0].onPress) buttons[0].onPress();
     }
   } else {
-    // Use native Alert for mobile platforms
     Alert.alert(title, message, buttons);
   }
 };

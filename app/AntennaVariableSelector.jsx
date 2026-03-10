@@ -348,29 +348,22 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
       }
     };
 
-    // Show confirmation dialog - different handling for web vs native
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(confirmMessage);
-      if (confirmed) {
-        await proceedWithCreation();
-      }
-    } else {
-      showAlert(
-        'Confirm Creation',
-        confirmMessage,
-        [
-          {
-            text: 'No',
-            style: 'cancel'
-          },
-          {
-            text: 'Yes',
-            onPress: proceedWithCreation,
-            style: 'default'
-          }
+    // Show confirmation dialog using the in-app modal
+    showAlert(
+      'Confirm Creation',
+      confirmMessage,
+      [
+        {
+          text: 'No',
+          style: 'cancel'
+        },
+        {
+          text: 'Yes',
+          onPress: proceedWithCreation,
+          style: 'default'
+        }
         ]
       );
-    }
   };
 
   const executeFileCreation = async () => {
@@ -741,14 +734,14 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               </Text>
             </View>
             <Switch
-              value={!optimizeAllMode}
+              value={optimizeAllMode}
               onValueChange={(value) => {
-                setOptimizeAllMode(!value);
+                setOptimizeAllMode(value);
                 if (value) {
                   setExcludedVariables(new Set());
                 }
               }}
-              trackColor={{ false: '#dbeafe', true: '#fef3c7' }}
+              trackColor={{ false: '#fef3c7', true: '#dbeafe' }}
               thumbColor={optimizeAllMode ? '#3b82f6' : '#f59e0b'}
             />
           </View>
@@ -808,27 +801,27 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Control Buttons */}
+        {/* Control Buttons — only shown in Custom Selection mode */}
+        {!optimizeAllMode && (
         <View style={styles.controlButtons}>
           <TouchableOpacity 
             onPress={clearExclusions} 
             style={styles.controlButton}
-            disabled={optimizeAllMode}
           >
-            <Text style={[styles.controlButtonText, optimizeAllMode && styles.controlButtonDisabled]}>
+            <Text style={styles.controlButtonText}>
               ✓ Include All
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={excludeAll} 
             style={styles.controlButton}
-            disabled={optimizeAllMode}
           >
-            <Text style={[styles.controlButtonText, optimizeAllMode && styles.controlButtonDisabled]}>
+            <Text style={styles.controlButtonText}>
               ✗ Exclude All
             </Text>
           </TouchableOpacity>
         </View>
+        )}
         
         <View style={styles.statsPanel}>
           <Text style={styles.statsText}>

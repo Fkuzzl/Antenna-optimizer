@@ -51,6 +51,7 @@ module.exports = {
     WS_EVENTS: {
         ITERATION_UPDATE: 'iterationUpdate',
         OPTIMIZATION_STATUS: 'optimizationStatus',
+        PROGRESSIVE_TUNING_UPDATE: 'progressiveTuningUpdate',
         ERROR: 'error',
         HEARTBEAT: 'heartbeat',
     },
@@ -63,6 +64,8 @@ module.exports = {
         COMPLETED: 'completed',
         ERROR: 'error',
         TERMINATED: 'terminated',
+        CANCELLED: 'cancelled',
+        STARTING: 'starting',
     },
 
     // HTTP status codes

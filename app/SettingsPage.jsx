@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { showAlert } from './app_config';
 
 const SettingsPage = ({ onBack }) => {
   const [serverConfig, setServerConfig] = useState(null);
@@ -12,7 +13,8 @@ const SettingsPage = ({ onBack }) => {
 
   const fetchServerConfig = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/server/config');
+      const AppConfig = require('./app_config').default;
+      const response = await fetch(`${AppConfig.serverUrl}/api/server/config`);
       if (response.ok) {
         const data = await response.json();
         setServerConfig(data);
@@ -29,11 +31,7 @@ const SettingsPage = ({ onBack }) => {
                    'Windows: Double-click OPEN_THIS/run_setup.bat\n' +
                    'Command: npm run setup';
     
-    if (Platform.OS === 'web') {
-      alert(message);
-    } else {
-      Alert.alert('Run Setup Wizard', message, [{ text: 'OK' }]);
-    }
+    showAlert('Run Setup Wizard', message);
   };
 
   const InfoItem = ({ icon, label, value }) => (

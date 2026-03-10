@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Platform, Clipboard, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform, Clipboard, Image } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AntennaVariableSelector from './AntennaVariableSelector';
 import SimulationResultsViewer from './SimulationResultsViewer';
 import AppConfig, { validateConfig, PathUtils, showAlert } from './app_config';
 
-export default function MatlabProjectRunner({ onBack }) {
-  const [filePath, setFilePath] = useState('');
+export default function MatlabProjectRunner({ onBack, initialProjectPath = '' }) {
+  const [filePath, setFilePath] = useState(initialProjectPath);
   const [isLoading, setIsLoading] = useState(false);
   const [isTerminating, setIsTerminating] = useState(false);
   const [isStopButtonDisabled, setIsStopButtonDisabled] = useState(false);
@@ -45,6 +45,14 @@ export default function MatlabProjectRunner({ onBack }) {
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
   const [locationValidationMessage, setLocationValidationMessage] = useState('');
 
+  // Auto-confirm when an initial path is injected (e.g. from Progressive Tuning → Run MOEA/D)
+  useEffect(() => {
+    if (initialProjectPath && initialProjectPath.trim()) {
+      setProjectLocationConfirmed(true);
+      setLocationValidationMessage('✅ Project location loaded from tuning results');
+    }
+  }, [initialProjectPath]);
+
   // WebSocket connection state
   const [wsConnected, setWsConnected] = useState(false);
   const [wsStatus, setWsStatus] = useState('Disconnected');
@@ -74,8 +82,8 @@ export default function MatlabProjectRunner({ onBack }) {
   useEffect(() => {
     const configValidation = validateConfig();
     if (!configValidation.valid) {
-      console.error('❌ Configuration errors:', configValidation.errors);
-      Alert.alert('Configuration Error', 
+      console.error('âŒ Configuration errors:', configValidation.errors);
+      showAlert('Configuration Error', 
         'Please update app_config.js with your PC\'s IP address.\n\n' + 
         configValidation.errors.join('\n')
       );
@@ -88,14 +96,14 @@ export default function MatlabProjectRunner({ onBack }) {
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN || 
           wsRef.current.readyState === WebSocket.CONNECTING) {
-        console.log('⚠️ WebSocket already connected or connecting, skipping...');
+        console.log('⚠ï¸ WebSocket already connected or connecting, skipping...');
         return; // Already connected or connecting
       }
     }
 
     try {
       console.log('🔗 Attempting to connect to WebSocket server...');
-      console.log('📍 Server URL:', WS_SERVER_URL);
+      console.log('ðŸ“ Server URL:', WS_SERVER_URL);
       setWsStatus('Connecting...');
       setServerStatus('Connecting...');
       
@@ -106,10 +114,10 @@ export default function MatlabProjectRunner({ onBack }) {
           timeout: 3000
         });
         if (!healthCheck.ok) {
-          console.warn('⚠️ Server health check failed, but attempting WebSocket anyway...');
+          console.warn('⚠ï¸ Server health check failed, but attempting WebSocket anyway...');
         }
       } catch (healthError) {
-        console.warn('⚠️ Cannot reach server HTTP endpoint:', healthError.message);
+        console.warn('⚠ï¸ Cannot reach server HTTP endpoint:', healthError.message);
         console.log('🔄 Will retry WebSocket connection...');
       }
       
@@ -135,7 +143,7 @@ export default function MatlabProjectRunner({ onBack }) {
               }));
               console.log('📡 WebSocket subscription sent successfully');
             } catch (error) {
-              console.error('❌ Failed to send WebSocket subscription:', error);
+              console.error('âŒ Failed to send WebSocket subscription:', error);
             }
           }
         }, 100); // 100ms delay
@@ -146,13 +154,13 @@ export default function MatlabProjectRunner({ onBack }) {
           const data = JSON.parse(event.data);
           handleWebSocketMessage(data);
         } catch (error) {
-          console.error('❌ WebSocket message parse error:', error);
+          console.error('âŒ WebSocket message parse error:', error);
         }
       };
       
       wsRef.current.onerror = (error) => {
         // Enhanced error logging with more context
-        console.error('❌ WebSocket error occurred');
+        console.error('âŒ WebSocket error occurred');
         console.error('Error type:', error?.type || 'unknown');
         console.error('Error message:', error?.message || 'No message available');
         console.error('WebSocket URL:', WS_SERVER_URL);
@@ -198,7 +206,7 @@ export default function MatlabProjectRunner({ onBack }) {
       };
       
     } catch (error) {
-      console.error('❌ WebSocket connection failed');
+      console.error('âŒ WebSocket connection failed');
       console.error('Error name:', error?.name || 'Unknown');
       console.error('Error message:', error?.message || 'No message');
       console.error('Error code:', error?.code || 'No code');
@@ -220,7 +228,7 @@ export default function MatlabProjectRunner({ onBack }) {
           connectWebSocket();
         }, delay);
       } else {
-        console.error('❌ Max reconnection attempts reached. Please check:');
+        console.error('âŒ Max reconnection attempts reached. Please check:');
         console.error('   1. Server is running: npm run server');
         console.error('   2. Server IP is correct: ' + MATLAB_SERVER_URL);
         console.error('   3. Firewall allows connections on port 3001');
@@ -279,7 +287,7 @@ export default function MatlabProjectRunner({ onBack }) {
         break;
         
       default:
-        console.log(`❓ Unknown WebSocket message type: ${data.type}`);
+        console.log(`â“ Unknown WebSocket message type: ${data.type}`);
     }
   };
 
@@ -315,16 +323,16 @@ export default function MatlabProjectRunner({ onBack }) {
 
   // Network diagnostics helper
   const checkNetworkConnectivity = async () => {
-    console.log('🔍 Running network diagnostics...');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('ðŸ” Running network diagnostics...');
+    console.log('â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
     
     // Check 1: Server URL configuration
-    console.log('📍 Configuration Check:');
+    console.log('ðŸ“ Configuration Check:');
     console.log('   HTTP Server:', MATLAB_SERVER_URL);
     console.log('   WebSocket Server:', WS_SERVER_URL);
     
     // Check 2: HTTP endpoint connectivity
-    console.log('\n🌐 Testing HTTP connectivity...');
+    console.log('\nðŸŒ Testing HTTP connectivity...');
     try {
       const startTime = Date.now();
       const response = await fetch(`${MATLAB_SERVER_URL}/api/matlab/status`, {
@@ -338,10 +346,10 @@ export default function MatlabProjectRunner({ onBack }) {
         const data = await response.json();
         console.log('   ✅ Server responding correctly');
       } else {
-        console.log(`   ⚠️ HTTP Status: ${response.status}`);
+        console.log(`   ⚠ï¸ HTTP Status: ${response.status}`);
       }
     } catch (error) {
-      console.log('   ❌ HTTP Connection Failed:', error.message);
+      console.log('   âŒ HTTP Connection Failed:', error.message);
       console.log('   💡 Check: Is server running? (npm run server)');
       console.log('   💡 Check: Is IP address correct?');
     }
@@ -359,14 +367,14 @@ export default function MatlabProjectRunner({ onBack }) {
       console.log('   Connected:', wsConnected);
       console.log('   Reconnect Count:', wsReconnectCount);
     } else {
-      console.log('   ⚠️ No WebSocket instance');
+      console.log('   ⚠ï¸ No WebSocket instance');
     }
     
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
     
-    Alert.alert(
+    showAlert(
       'Network Diagnostics',
-      `Check console logs for detailed results.\n\nQuick Status:\nHTTP: ${wsConnected ? '✅' : '❌'}\nWebSocket: ${wsConnected ? '✅ Connected' : '❌ Disconnected'}`,
+      `Check console logs for detailed results.\n\nQuick Status:\nHTTP: ${wsConnected ? '✅' : 'âŒ'}\nWebSocket: ${wsConnected ? '✅ Connected' : 'âŒ Disconnected'}`,
       [{ text: 'OK' }]
     );
   };
@@ -392,28 +400,19 @@ export default function MatlabProjectRunner({ onBack }) {
     try {
       const savedPaths = await AsyncStorage.getItem('matlabPathHistory');
       if (savedPaths) {
-        setPathHistory(JSON.parse(savedPaths));
+        const parsed = JSON.parse(savedPaths);
+        setPathHistory(parsed);
+        // Auto-fill last used path for convenience
+        if (parsed.length > 0) {
+          setFilePath(parsed[0]);
+        }
       } else {
-        // Preload with default valid paths if no history exists
-        const defaultPaths = [
-          'C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\Main_run_this_3obj.mlx',
-          'C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\antenna_optimization.mlx',
-          'C:\\Projects\\MATLAB\\filter_design.mlx'
-        ];
-        setPathHistory(defaultPaths);
-        setFilePath('C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\Main_run_this_3obj.mlx'); // Set default path
-        await AsyncStorage.setItem('matlabPathHistory', JSON.stringify(defaultPaths));
+        // No history — start fresh
+        setPathHistory([]);
       }
     } catch (error) {
       console.error('Error loading path history:', error);
-      // Fallback to default path if storage fails
-      const defaultPaths = [
-        'C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\Main_run_this_3obj.mlx',
-        'C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\antenna_optimization.mlx',
-        'C:\\Projects\\MATLAB\\filter_design.mlx'
-      ];
-      setPathHistory(defaultPaths);
-      setFilePath('C:\\ANSYS_electronic_FYP\\MOEA_D_DE_0923\\Main_run_this_3obj.mlx'); // Set default path
+      setPathHistory([]);
     }
   };
 
@@ -433,7 +432,7 @@ export default function MatlabProjectRunner({ onBack }) {
     try {
       setPathHistory([]);
       await AsyncStorage.removeItem('matlabPathHistory');
-      Alert.alert('Cleared', 'Path history cleared');
+      showAlert('Cleared', 'Path history cleared');
     } catch (error) {
       console.error('Error clearing path history:', error);
     }
@@ -442,7 +441,7 @@ export default function MatlabProjectRunner({ onBack }) {
   // Validate project location
   const validateProjectLocation = async () => {
     if (!filePath.trim()) {
-      Alert.alert('Invalid Path', 'Please enter a project path');
+      showAlert('Invalid Path', 'Please enter a project path');
       return;
     }
 
@@ -450,50 +449,36 @@ export default function MatlabProjectRunner({ onBack }) {
     setLocationValidationMessage('Validating project location...');
 
     try {
-      // Simple validation - check if path looks like a valid MATLAB file
-      const validExtensions = ['.mlx', '.m'];
-      const hasValidExtension = validExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
-      
-      if (!hasValidExtension) {
-        setLocationValidationMessage('❌ Invalid file type. Please select a .mlx or .m file');
-        setIsValidatingLocation(false);
-        return;
-      }
-
-      // Additional validation - check if path looks realistic
-      const isWindowsPath = filePath.includes(':\\') || filePath.includes('C:');
+      // Accept: a directory path  OR  a .mlx / .m file path
+      const isWindowsPath = /^[a-zA-Z]:[\\]/.test(filePath) || filePath.includes(':\\\\');
       const isLinuxPath = filePath.startsWith('/');
-      
+
       if (!isWindowsPath && !isLinuxPath) {
         setLocationValidationMessage('❌ Path format not recognized. Please use full path');
         setIsValidatingLocation(false);
         return;
       }
 
-      // Simulate validation delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // For now, accept the path as valid (in real scenario, you might check file system)
+      // Accept the path as valid
       setProjectLocationConfirmed(true);
       setLocationValidationMessage('✅ Project location validated successfully');
       await savePathToHistory(filePath);
-      
+
       // Create/update integrated Excel file after path validation
       await createIntegratedExcel();
-      
-      const fileName = filePath.split('\\').pop() || filePath.split('/').pop();
-      const fileType = filePath.toLowerCase().endsWith('.mlx') ? 'MATLAB Live Script' : 'MATLAB Script';
-      
-      Alert.alert(
-        'Location Confirmed', 
-        `Project validated successfully!\n\nFile: ${fileName}\nType: ${fileType}\n\n📊 Integrated results cache initialized.\nReady to launch.`
+
+      const projectName = filePath.split(/[\\/]/).filter(Boolean).pop() || filePath;
+
+      showAlert(
+        'Location Confirmed',
+        `Project validated successfully!\n\n📁 ${projectName}\n\n📊 Integrated results cache initialized.\nReady to launch.`
       );
 
     } catch (error) {
       console.error('Error validating location:', error);
       setLocationValidationMessage('❌ Validation failed');
     }
-    
+
     setIsValidatingLocation(false);
   };
 
@@ -501,7 +486,7 @@ export default function MatlabProjectRunner({ onBack }) {
   const resetProjectLocation = () => {
     // Prevent changing location while project is running
     if (executionState?.isRunning) {
-      Alert.alert(
+      showAlert(
         'Cannot Change Location',
         'Please stop the running project before changing the location.',
         [{ text: 'OK' }]
@@ -528,16 +513,16 @@ export default function MatlabProjectRunner({ onBack }) {
       const result = await response.json();
 
       if (result.success) {
-        Alert.alert(
+        showAlert(
           'File Generated',
           `File updated with ${selectedVariableIds.length} variables.\n\nSeed range: ${result.seedRange}`
         );
       } else {
-        Alert.alert('Error', result.message || 'Failed to generate file');
+        showAlert('Error', result.message || 'Failed to generate file');
       }
     } catch (error) {
       console.error('Error generating F_Model_Element:', error);
-      Alert.alert('Connection Error', 'Cannot connect to server');
+      showAlert('Connection Error', 'Cannot connect to server');
     }
   };
 
@@ -574,16 +559,16 @@ export default function MatlabProjectRunner({ onBack }) {
           ? `${statsText}${backupText}${fModelText}`
           : '\n\nNo optimization folder was found.';
         
-        Alert.alert(
+        showAlert(
           'Complete',
           `${result.message}${detailsText}`
         );
       } else {
-        Alert.alert('Error', result.message || 'Operation failed');
+        showAlert('Error', result.message || 'Operation failed');
       }
     } catch (error) {
       console.error('Error managing optimization folder:', error);
-      Alert.alert('Connection Error', 'Cannot connect to server');
+      showAlert('Connection Error', 'Cannot connect to server');
     } finally {
       setIsLoading(false);
     }
@@ -627,20 +612,20 @@ export default function MatlabProjectRunner({ onBack }) {
           if (clearResult.success) {
             console.log('✅ Integrated Excel file cleared after optimization folder deletion');
           } else {
-            console.log('⚠️ Could not clear integrated Excel file:', clearResult.message);
+            console.log('⚠ï¸ Could not clear integrated Excel file:', clearResult.message);
           }
         } catch (clearError) {
-          console.error('❌ Error clearing integrated Excel file:', clearError);
+          console.error('âŒ Error clearing integrated Excel file:', clearError);
         }
 
         return { success: true, result }; // Return the detailed result
       } else {
-        Alert.alert('Error', result.message || 'Operation failed');
+        showAlert('Error', result.message || 'Operation failed');
         return { success: false };
       }
     } catch (error) {
       console.error('Error in optimization management:', error);
-      Alert.alert('Connection Error', 'Cannot connect to server');
+      showAlert('Connection Error', 'Cannot connect to server');
       return { success: false };
     } finally {
       setIsLoading(false);
@@ -657,7 +642,7 @@ export default function MatlabProjectRunner({ onBack }) {
       });
 
       if (!response.ok) {
-        console.warn('⚠️ Failed to fetch execution state');
+        console.warn('⚠ï¸ Failed to fetch execution state');
         return;
       }
 
@@ -667,17 +652,20 @@ export default function MatlabProjectRunner({ onBack }) {
         console.log('✅ Execution state fetched:', result.execution);
         setExecutionState(result.execution);
         
-        // If MATLAB is running, restore the file path
-        if (result.execution.isRunning && result.execution.filePath) {
-          setFilePath(result.execution.filePath);
+        // If MATLAB is running, restore the project path
+        if (result.execution.isRunning && (result.execution.projectPath || result.execution.filePath)) {
+          const restoredPath = result.execution.projectPath || result.execution.fileDir || result.execution.filePath;
+          setFilePath(restoredPath);
           setProjectLocationConfirmed(true);
         }
         
-        // Handle iteration data based on whether we have a file path
+        // Handle iteration data based on whether we have a project path
         if (result.execution.isRunning) {
-          if (result.execution.filePath) {
-            // Fetch iteration data when file path is available
-            const iterResponse = await fetch(`${MATLAB_SERVER_URL}/api/matlab/iteration-count?projectPath=${encodeURIComponent(result.execution.filePath)}`, {
+          const resolvedProjectPath = result.execution.projectPath || result.execution.fileDir
+            || (result.execution.filePath ? result.execution.filePath.replace(/[\\][^\\]+$/, '') : null);
+          if (resolvedProjectPath) {
+            // Fetch iteration data when project path is available
+            const iterResponse = await fetch(`${MATLAB_SERVER_URL}/api/matlab/iteration-count?projectPath=${encodeURIComponent(resolvedProjectPath)}`, {
               method: 'GET',
               headers: { 'Content-Type': 'application/json' }
             });
@@ -707,7 +695,7 @@ export default function MatlabProjectRunner({ onBack }) {
               });
             }
           } else {
-            // MATLAB running but no file path (external start)
+            // MATLAB running but no project path (external start)
             setIterationData({
               count: 0,
               current: null,
@@ -716,7 +704,7 @@ export default function MatlabProjectRunner({ onBack }) {
               message: 'External MATLAB session - project path unknown',
               tempDir: null
             });
-            console.log('⚠️ MATLAB running externally - no project path available');
+            console.log('⚠ï¸ MATLAB running externally - no project path available');
           }
         }
       }
@@ -726,7 +714,7 @@ export default function MatlabProjectRunner({ onBack }) {
         setHfssProcesses(result.processDetails.hfss.processes);
       }
     } catch (error) {
-      console.error('❌ Error fetching execution state:', error);
+      console.error('âŒ Error fetching execution state:', error);
     }
   };
 
@@ -792,10 +780,10 @@ export default function MatlabProjectRunner({ onBack }) {
         // Only log Excel creation once per project setup
         console.log('📊 Results cache initialized');
       } else {
-        console.log('⚠️ Could not initialize results cache:', result.message);
+        console.log('⚠ï¸ Could not initialize results cache:', result.message);
       }
     } catch (error) {
-      console.error('❌ Error creating integrated Excel file:', error);
+      console.error('âŒ Error creating integrated Excel file:', error);
     }
   };
 
@@ -839,10 +827,10 @@ export default function MatlabProjectRunner({ onBack }) {
         // Minimal logging - just show iteration number
         console.log(`📊 Results updated (iteration ${iteration || 'current'})`);
       } else {
-        console.log('⚠️ Results update failed:', result.message);
+        console.log('⚠ï¸ Results update failed:', result.message);
       }
     } catch (error) {
-      console.error('❌ Error updating integrated Excel file:', error);
+      console.error('âŒ Error updating integrated Excel file:', error);
     }
   };
 
@@ -857,7 +845,7 @@ export default function MatlabProjectRunner({ onBack }) {
           clipboardContent = await navigator.clipboard.readText();
         } else {
           // Fallback for older browsers
-          Alert.alert('Paste Not Supported', 'Use Ctrl+V to paste');
+          showAlert('Paste Not Supported', 'Use Ctrl+V to paste');
           return;
         }
       } else {
@@ -868,14 +856,14 @@ export default function MatlabProjectRunner({ onBack }) {
       if (clipboardContent) {
         setFilePath(clipboardContent);
       } else {
-        Alert.alert('Clipboard Empty', 'Nothing to paste');
+        showAlert('Clipboard Empty', 'Nothing to paste');
       }
     } catch (error) {
       console.error('Failed to paste from clipboard:', error);
       if (Platform.OS === 'web') {
-        Alert.alert('Paste Error', 'Use Ctrl+V to paste');
+        showAlert('Paste Error', 'Use Ctrl+V to paste');
       } else {
-        Alert.alert('Paste Error', 'Use Ctrl+V to paste');
+        showAlert('Paste Error', 'Use Ctrl+V to paste');
       }
     }
   };
@@ -992,7 +980,7 @@ export default function MatlabProjectRunner({ onBack }) {
         await new Promise(resolve => setTimeout(resolve, 500));
         setIsInitialLoading(false);
       } catch (error) {
-        console.error('❌ Initialization error:', error);
+        console.error('âŒ Initialization error:', error);
         setLoadingMessage('Initialization complete');
         setIsInitialLoading(false);
       }
@@ -1033,7 +1021,7 @@ export default function MatlabProjectRunner({ onBack }) {
 
   const handleRunProject = async () => {
     if (!filePath.trim()) {
-      Alert.alert('Error', 'Please enter a file path');
+      showAlert('Error', 'Please enter a file path');
       return;
     }
 
@@ -1046,7 +1034,7 @@ export default function MatlabProjectRunner({ onBack }) {
       processId: null
     });
     
-    // Disable stop button for 10 seconds to allow program to stabilize
+    // Disable stop button briefly to allow program to start
     setIsStopButtonDisabled(true);
     
     // Clear any existing timer
@@ -1054,11 +1042,11 @@ export default function MatlabProjectRunner({ onBack }) {
       clearTimeout(stopButtonTimerRef.current);
     }
     
-    // Enable stop button after 10 seconds
+    // Enable stop button after 3 seconds
     stopButtonTimerRef.current = setTimeout(() => {
       setIsStopButtonDisabled(false);
       console.log('✅ Stop button enabled - program stabilized');
-    }, 10000);
+    }, 3000);
 
     setIsLoading(true);
 
@@ -1067,7 +1055,7 @@ export default function MatlabProjectRunner({ onBack }) {
         createFetchConfig({
           method: 'POST',
           body: JSON.stringify({
-            filePath: filePath
+            projectPath: filePath
           }),
         })
       );
@@ -1089,10 +1077,8 @@ export default function MatlabProjectRunner({ onBack }) {
         // Save valid path to history
         await savePathToHistory(filePath);
         
-        Alert.alert(
-          'Started Successfully', 
-          `MATLAB is running your project.\n\nMonitor progress in real-time below.`
-        );
+        // Success - status cards already show "Running" so no blocking alert needed
+        console.log('✅ MATLAB started successfully');
       } else {
         // Revert to stopped state if API call fails
         setExecutionState({
@@ -1106,7 +1092,7 @@ export default function MatlabProjectRunner({ onBack }) {
           clearTimeout(stopButtonTimerRef.current);
           stopButtonTimerRef.current = null;
         }
-        Alert.alert('Error', result.message);
+        showAlert('Error', result.message);
       }
     } catch (error) {
       console.error('Error running project:', error);
@@ -1122,7 +1108,7 @@ export default function MatlabProjectRunner({ onBack }) {
         clearTimeout(stopButtonTimerRef.current);
         stopButtonTimerRef.current = null;
       }
-      Alert.alert('Error', 'Cannot start project');
+      showAlert('Error', 'Cannot start project');
     } finally {
       setIsLoading(false);
     }
@@ -1136,7 +1122,7 @@ export default function MatlabProjectRunner({ onBack }) {
     }
     
     // Show immediate feedback
-    Alert.alert(
+    showAlert(
       'Stopping Project',
       'Sending shutdown signal to MATLAB...',
       [{ text: 'OK', onPress: () => {} }]
@@ -1170,7 +1156,7 @@ export default function MatlabProjectRunner({ onBack }) {
           message: null,
           tempDir: null
         });
-        Alert.alert(
+        showAlert(
           'Project Stopped', 
           `${result.message}\n\nMATLAB execution stopped successfully.`
         );
@@ -1190,7 +1176,7 @@ export default function MatlabProjectRunner({ onBack }) {
           message: null,
           tempDir: null
         });
-        Alert.alert('Already Stopped', result.message);
+        showAlert('Already Stopped', result.message);
       }
     } catch (error) {
       console.error('Stop request error:', error);
@@ -1209,7 +1195,7 @@ export default function MatlabProjectRunner({ onBack }) {
         message: null,
         tempDir: null
       });
-      Alert.alert('Connection Error', 'Cannot connect to server');
+      showAlert('Connection Error', 'Cannot connect to server');
     } finally {
       setIsLoading(false);
       setIsTerminating(false);
@@ -1285,12 +1271,12 @@ export default function MatlabProjectRunner({ onBack }) {
       >
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>â† Back</Text>
           </TouchableOpacity>
           <View style={styles.headerStatus}>
             <View style={[styles.statusDot, 
-              serverStatus.includes('Connected') && !serverStatus.includes('⚠️') ? styles.statusDotGreen :
-              serverStatus.includes('⚠️') ? styles.statusDotYellow : styles.statusDotRed
+              serverStatus.includes('Connected') && !serverStatus.includes('⚠ï¸') ? styles.statusDotGreen :
+              serverStatus.includes('⚠ï¸') ? styles.statusDotYellow : styles.statusDotRed
             ]} />
           </View>
         </View>
@@ -1373,7 +1359,7 @@ export default function MatlabProjectRunner({ onBack }) {
               if (projectLocationConfirmed && filePath) {
                 setShowSimulationResults(true);
               } else {
-                Alert.alert(
+                showAlert(
                   'Project Location Required',
                   'Please confirm your project location first to view simulation results from the correct directory.'
                 );
@@ -1424,15 +1410,11 @@ export default function MatlabProjectRunner({ onBack }) {
                     ? 'Next Steps for Live Script (.mlx):\n\n• Live Script is executing automatically in MATLAB\n• Monitor progress in the MATLAB GUI window\n• Use "Stop Project" button to close MATLAB when done\n\nNote: Live Scripts now execute automatically on launch.'
                     : 'Next Steps for Script (.m):\n\n• Script should be executing automatically in MATLAB\n• Monitor progress in the MATLAB GUI window\n• Use "Stop Project" button to close MATLAB when done\n\nNote: Regular scripts execute automatically.';
                   
-                  if (Platform.OS === 'web') {
-                    window.alert('💡 Session Instructions\n\n' + instructions);
-                  } else {
-                    Alert.alert('💡 Session Instructions', instructions);
-                  }
+                  showAlert('Session Instructions', instructions);
                 }}
                 style={styles.infoIcon}
               >
-                <Text style={styles.infoIconText}>ℹ️</Text>
+                <Text style={styles.infoIconText}>ℹï¸</Text>
               </TouchableOpacity>
             </View>
             
@@ -1448,10 +1430,10 @@ export default function MatlabProjectRunner({ onBack }) {
                 </View>
                 <View style={styles.sessionDetails}>
                   <Text style={styles.sessionDetailText} numberOfLines={3}>
-                    📄 {executionState.fileName} • ⏱️ {runningTime}
+                    📄 {executionState.fileName} • â±ï¸ {runningTime}
                     {iterationData.current && ` • Current Iteration: ${iterationData.current}`}
                     {executionState.filePath && (
-                      `\n📁 ${getProjectDirectory(executionState.filePath)}`
+                      `\nðŸ“ ${getProjectDirectory(executionState.filePath)}`
                     )}
                   </Text>
                 </View>
@@ -1472,7 +1454,7 @@ export default function MatlabProjectRunner({ onBack }) {
                 <View style={styles.sessionDetails}>
                   <Text style={styles.sessionDetailText}>
                     ⚡ Active: {connectionStats.stats?.established || 0} • 
-                    🕐 TIME_WAIT: {connectionStats.stats?.timeWait || 0} • 
+                    ðŸ• TIME_WAIT: {connectionStats.stats?.timeWait || 0} • 
                     👥 WebSocket Clients: {connectionStats.wsClients || 0}
                   </Text>
                   <Text style={styles.sessionDetailText}>
@@ -1538,7 +1520,7 @@ export default function MatlabProjectRunner({ onBack }) {
           
           <View style={[styles.inputContainer, showPathHistory && styles.inputContainerExpanded]}>
             <View style={styles.inputHeader}>
-              <Text style={styles.inputLabel}>📁 MATLAB Project Path</Text>
+              <Text style={styles.inputLabel}>ðŸ“ MATLAB Project Path</Text>
               {!projectLocationConfirmed && (
                 <View style={styles.inputActions}>
                   {pathHistory.length > 0 && (
@@ -1565,7 +1547,7 @@ export default function MatlabProjectRunner({ onBack }) {
                 value={filePath}
                 onChangeText={setFilePath}
                 onFocus={() => setShowPathHistory(false)}
-                placeholder="C:\Projects\MATLAB\MyProject\optimization_script.mlx"
+                placeholder="C:\Projects\MATLAB\MyProject\MOEA_D_DE_3obj_current"
                 placeholderTextColor="#94a3b8"
                 multiline={true}
                 numberOfLines={2}
@@ -1588,13 +1570,13 @@ export default function MatlabProjectRunner({ onBack }) {
               <View style={[
                 styles.validationMessage,
                 locationValidationMessage.includes('✅') && styles.validationSuccess,
-                locationValidationMessage.includes('❌') && styles.validationError
+                locationValidationMessage.includes('âŒ') && styles.validationError
               ]}>
                 <View style={styles.validationContent}>
                   <Text style={[
                     styles.validationText,
                     locationValidationMessage.includes('✅') && styles.validationTextSuccess,
-                    locationValidationMessage.includes('❌') && styles.validationTextError
+                    locationValidationMessage.includes('âŒ') && styles.validationTextError
                   ]}>
                     {locationValidationMessage}
                   </Text>
@@ -1606,21 +1588,21 @@ export default function MatlabProjectRunner({ onBack }) {
                       </View>
                       <View style={styles.pathDetailsGrid}>
                         <View style={styles.pathDetailItem}>
-                          <Text style={styles.pathDetailLabel}>File Name:</Text>
+                          <Text style={styles.pathDetailLabel}>Project Folder:</Text>
                           <Text style={styles.pathDetailValue}>
-                            {filePath.split('\\').pop() || filePath.split('/').pop()}
+                            {filePath.split(/[\\]|(?<=\/)/).filter(Boolean).pop() || filePath}
                           </Text>
                         </View>
                         <View style={styles.pathDetailItem}>
                           <Text style={styles.pathDetailLabel}>Type:</Text>
                           <Text style={styles.pathDetailValue}>
-                            {filePath.toLowerCase().endsWith('.mlx') ? 'MATLAB Live Script' : 'MATLAB Script'}
+                            {filePath.toLowerCase().endsWith('.mlx') ? 'MATLAB Live Script' : filePath.toLowerCase().endsWith('.m') ? 'MATLAB Script' : 'Project Directory'}
                           </Text>
                         </View>
                         <View style={styles.pathDetailItem}>
-                          <Text style={styles.pathDetailLabel}>Directory:</Text>
+                          <Text style={styles.pathDetailLabel}>Full Path:</Text>
                           <Text style={[styles.pathDetailValue, styles.pathDetailDirectory]} numberOfLines={2}>
-                            {filePath.substring(0, filePath.lastIndexOf('\\') || filePath.lastIndexOf('/'))}
+                            {filePath}
                           </Text>
                         </View>
                       </View>
@@ -1633,7 +1615,7 @@ export default function MatlabProjectRunner({ onBack }) {
                         <TouchableOpacity 
                           onPress={() => {
                             Clipboard.setString(filePath);
-                            Alert.alert('📋 Copied', 'Project path copied to clipboard');
+                            showAlert('📋 Copied', 'Project path copied to clipboard');
                           }} 
                           style={styles.copyPathButton}
                         >
@@ -1652,7 +1634,7 @@ export default function MatlabProjectRunner({ onBack }) {
                 <View style={styles.historyHeader}>
                   <Text style={styles.historyTitle}>📂 Recent Valid Paths</Text>
                   <TouchableOpacity onPress={clearPathHistory} style={styles.clearHistoryButton}>
-                    <Text style={styles.clearHistoryText}>🗑️ Clear</Text>
+                    <Text style={styles.clearHistoryText}>🗑ï¸ Clear</Text>
                   </TouchableOpacity>
                 </View>
                 
@@ -1713,7 +1695,7 @@ export default function MatlabProjectRunner({ onBack }) {
                   style={styles.actionButtonGradient}
                 >
                   <Text style={styles.actionButtonIcon}>
-                    {isValidatingLocation ? '⏳' : '✅'}
+                    {isValidatingLocation ? 'â³' : '✅'}
                   </Text>
                   <Text style={styles.actionButtonText}>
                     {isValidatingLocation ? 'Validating...' : 'Confirm Location'}
@@ -1751,9 +1733,9 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>1</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>📁 Enter Project File Path</Text>
+                    <Text style={styles.guideStepTitle}>ðŸ“ Enter Project File Path</Text>
                     <Text style={styles.guideStepDescription}>
-                      Type or paste the full path to your MATLAB Live Script (.mlx) file.{' \n'}
+                      Type or paste the full path to your MATLAB project directory.{' \n'}
                       💡 Tip: Use the History button to access previously used paths
                     </Text>
                   </View>
@@ -1788,7 +1770,7 @@ export default function MatlabProjectRunner({ onBack }) {
                     <Text style={styles.guideStepNumberText}>4</Text>
                   </View>
                   <View style={styles.guideStepContent}>
-                    <Text style={styles.guideStepTitle}>⏹️ Control & Stop</Text>
+                    <Text style={styles.guideStepTitle}>â¹ï¸ Control & Stop</Text>
                     <Text style={styles.guideStepDescription}>
                       Press "Stop" to gracefully terminate MATLAB when needed, or let it continue running for manual control
                     </Text>
@@ -1799,10 +1781,10 @@ export default function MatlabProjectRunner({ onBack }) {
               <View style={styles.guideFeatures}>
                 <Text style={styles.guideFeaturesTitle}>Key Capabilities</Text>
                 <View style={styles.guideFeaturesList}>
-                  <Text style={styles.guideFeature}>🖥️ Visual MATLAB window - see exactly what's running</Text>
+                  <Text style={styles.guideFeature}>🖥ï¸ Visual MATLAB window - see exactly what's running</Text>
                   <Text style={styles.guideFeature}>📈 Real-time iteration tracking and results</Text>
                   <Text style={styles.guideFeature}>⚡ HFSS process monitoring during simulations</Text>
-                  <Text style={styles.guideFeature}>🎛️ Remote control - start, stop, and manage from anywhere</Text>
+                  <Text style={styles.guideFeature}>🎛ï¸ Remote control - start, stop, and manage from anywhere</Text>
                 </View>
               </View>
               
@@ -1833,7 +1815,7 @@ export default function MatlabProjectRunner({ onBack }) {
                 style={styles.floatingActionButtonGradient}
               >
                 <Text style={styles.floatingActionButtonIcon}>
-                  {executionState?.isRunning ? '🔄' : '▶️'}
+                  {executionState?.isRunning ? '🔄' : '▶ï¸'}
                 </Text>
                 <Text style={styles.floatingActionButtonText}>
                   {executionState?.isRunning ? 'Running...' : 'Launch'}
@@ -1853,7 +1835,7 @@ export default function MatlabProjectRunner({ onBack }) {
                   colors={(isTerminating || isStopButtonDisabled) ? ['#e2e8f0', '#cbd5e1'] : ['#ef4444', '#dc2626']}
                   style={styles.floatingActionButtonGradient}
                 >
-                  <Text style={styles.floatingActionButtonIcon}>⏹️</Text>
+                  <Text style={styles.floatingActionButtonIcon}>â¹ï¸</Text>
                   <Text style={[styles.floatingActionButtonText, 
                     (isTerminating || isStopButtonDisabled) ? styles.disabledActionText : styles.enabledActionText
                   ]}>

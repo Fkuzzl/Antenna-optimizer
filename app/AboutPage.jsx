@@ -152,23 +152,17 @@ const AboutPage = ({ onBack }) => {
           
           <InfoRow 
             label="Documentation" 
-            value="User Guide & API Docs" 
-            isLink={true}
-            onPress={() => openURL('https://docs.matlabstudio.com')}
+            value="See DOCUMENTATION.md" 
           />
           
           <InfoRow 
-            label="GitHub Repository" 
-            value="View Source Code" 
-            isLink={true}
-            onPress={() => openURL('https://github.com/matlabstudio/app')}
+            label="Setup Guide" 
+            value="See OPEN_THIS/SETUP/README.md" 
           />
           
           <InfoRow 
             label="Technical Support" 
-            value="support@matlabstudio.com" 
-            isLink={true}
-            onPress={() => openURL('mailto:support@matlabstudio.com')}
+            value="Contact project supervisor" 
           />
         </View>
 
@@ -191,10 +185,10 @@ const AboutPage = ({ onBack }) => {
             style={styles.footerGradient}
           >
             <Text style={styles.footerText}>
-              © 2025 MATLAB Studio. Professional antenna optimization platform.
+              GPS CP Antenna Optimizer — Final Year Project 2024-2025
             </Text>
             <Text style={styles.footerSubtext}>
-              MATLAB and HFSS are trademarks of their respective owners.
+              MATLAB® and HFSS® are trademarks of their respective owners.
             </Text>
           </LinearGradient>
         </View>

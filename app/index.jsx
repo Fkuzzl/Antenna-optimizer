@@ -1,14 +1,157 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Image, Platform } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Image, Platform, TextInput, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MatlabProjectRunner from './MatlabProjectRunner';
 import SettingsPage from './SettingsPage';
 import AboutPage from './AboutPage';
+import ProgressiveTuningSetup from './ProgressiveTuningSetup';
+import ProgressiveTuningProgress from './ProgressiveTuningProgress';
+import ProgressiveTuningResults from './ProgressiveTuningResults';
+import AppConfig from './app_config';
+import { ModalProvider, useModal } from './InAppModal';
 
 const { width, height } = Dimensions.get('window');
 
+// Outer wrapper that provides the modal context
+const App = () => (
+  <ModalProvider>
+    <HomePage />
+  </ModalProvider>
+);
+
 const HomePage = () => {
+  const { alert: modalAlert, showBusy } = useModal();
   const [currentPage, setCurrentPage] = useState('home');
+  // Progressive tuning state
+  const [tuningProjectPath, setTuningProjectPath] = useState('');
+  const [tuningResultsData, setTuningResultsData] = useState(null);
+  const [checkingTuningStatus, setCheckingTuningStatus] = useState(false);
+  const [checkingMatlabStatus, setCheckingMatlabStatus] = useState(false);
+
+  /**
+   * Check if MATLAB optimization is currently running.
+   * Returns true if running, false otherwise.
+   */
+  const isMatlabOptimizationRunning = useCallback(async () => {
+    try {
+      const response = await fetch(`${AppConfig.serverUrl}/api/matlab/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      return !!(data.execution && data.execution.isRunning);
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /**
+   * Check if progressive tuning is currently running.
+   * Returns { running: boolean, projectPath?: string }
+   */
+  const isProgressiveTuningRunning = useCallback(async () => {
+    try {
+      const response = await fetch(`${AppConfig.serverUrl}/api/progressive-tuning/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        const managerStatus = data.data.manager?.status || data.data.status;
+        if (managerStatus === 'running' || managerStatus === 'paused') {
+          return { running: true, projectPath: data.data.manager?.projectPath };
+        }
+      }
+      return { running: false };
+    } catch {
+      return { running: false };
+    }
+  }, []);
+
+  /**
+   * Navigate to MATLAB optimization — but first check if Progressive Tuning is running.
+   * If it is, show an in-app popup with a navigate button instead.
+   */
+  const handleOptimizationPress = useCallback(async () => {
+    setCheckingMatlabStatus(true);
+    try {
+      const tuning = await isProgressiveTuningRunning();
+      if (tuning.running) {
+        showBusy({
+          title: 'Machine Busy',
+          message: 'Progressive Tuning is currently running on this machine. You cannot start Antenna Optimization while tuning is in progress.',
+          navigateLabel: 'Go to Progressive Tuning',
+          onNavigate: () => {
+            if (tuning.projectPath) setTuningProjectPath(tuning.projectPath);
+            setCurrentPage('progressiveTuningProgress');
+          },
+        });
+        return;
+      }
+    } catch (err) {
+      console.log('Could not check tuning status:', err.message);
+    } finally {
+      setCheckingMatlabStatus(false);
+    }
+    setCurrentPage('matlab');
+  }, [isProgressiveTuningRunning, showBusy]);
+
+  /**
+   * Check if a tuning session is already active on the server.
+   * Also checks if MATLAB optimization is running — if so, block entry.
+   * Note: Progressive Tuning itself uses MATLAB, so we check tuning status
+   * FIRST — if tuning is already running, those MATLAB processes belong to
+   * tuning and should not trigger the mutual-exclusion block.
+   */
+  const handleProgressiveTuningPress = useCallback(async () => {
+    setCheckingTuningStatus(true);
+    try {
+      // Check if a tuning session is already active FIRST
+      const response = await fetch(`${AppConfig.serverUrl}/api/progressive-tuning/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        const managerStatus = data.data.manager?.status || data.data.status;
+        if (managerStatus === 'running' || managerStatus === 'paused') {
+          // Tuning is already active — go straight to progress page
+          if (data.data.manager?.projectPath) {
+            setTuningProjectPath(data.data.manager.projectPath);
+          }
+          setCurrentPage('progressiveTuningProgress');
+          return;
+        }
+        if (managerStatus === 'completed' || managerStatus === 'error' || managerStatus === 'cancelled') {
+          // Tuning finished but server not yet reset — re-enter progress page
+          // which will detect the final status immediately and transition to results.
+          if (data.data.manager?.projectPath) {
+            setTuningProjectPath(data.data.manager.projectPath);
+          }
+          setCurrentPage('progressiveTuningProgress');
+          return;
+        }
+      }
+
+      // No tuning session active — NOW check if MATLAB optimization is running
+      const matlabRunning = await isMatlabOptimizationRunning();
+      if (matlabRunning) {
+        showBusy({
+          title: 'Machine Busy',
+          message: 'Antenna Optimization (MATLAB) is currently running on this machine. You cannot start Progressive Tuning while optimization is in progress.',
+          navigateLabel: 'Go to Antenna Optimization',
+          onNavigate: () => setCurrentPage('matlab'),
+        });
+        return;
+      }
+    } catch (err) {
+      console.log('Could not check tuning status:', err.message);
+    } finally {
+      setCheckingTuningStatus(false);
+    }
+    // No active session — go to setup
+    setCurrentPage('progressiveTuningSetup');
+  }, [isMatlabOptimizationRunning, showBusy]);
 
   // Navigation functions
   const navigateToPage = (page) => {
@@ -24,12 +167,57 @@ const HomePage = () => {
     return <MatlabProjectRunner onBack={navigateHome} />;
   }
 
+  if (currentPage === 'matlabFromTuning') {
+    return <MatlabProjectRunner onBack={navigateHome} initialProjectPath={tuningProjectPath} />;
+  }
+
   if (currentPage === 'settings') {
     return <SettingsPage onBack={navigateHome} />;
   }
 
   if (currentPage === 'about') {
     return <AboutPage onBack={navigateHome} />;
+  }
+
+  if (currentPage === 'progressiveTuningSetup') {
+    return (
+      <ProgressiveTuningSetup
+        onBack={navigateHome}
+        projectPath={tuningProjectPath}
+        onSetProjectPath={setTuningProjectPath}
+        onStart={() => setCurrentPage('progressiveTuningProgress')}
+      />
+    );
+  }
+
+  if (currentPage === 'progressiveTuningProgress') {
+    return (
+      <ProgressiveTuningProgress
+        onBack={navigateHome}
+        projectPath={tuningProjectPath}
+        onComplete={(data) => {
+          setTuningResultsData(data);
+          setCurrentPage('progressiveTuningResults');
+        }}
+      />
+    );
+  }
+
+  if (currentPage === 'progressiveTuningResults') {
+    return (
+      <ProgressiveTuningResults
+        onBack={navigateHome}
+        statusData={tuningResultsData}
+        onRunMoead={(results) => {
+          // Navigate to MATLAB runner pre-filled with the tuning project path
+          setCurrentPage('matlabFromTuning');
+        }}
+        onRerun={() => {
+          setTuningResultsData(null);
+          setCurrentPage('progressiveTuningSetup');
+        }}
+      />
+    );
   }
 
   return (
@@ -51,18 +239,6 @@ const HomePage = () => {
           />
           <Text style={styles.appTitle}>Antenna Optimizer</Text>
           <Text style={styles.appSubtitle}>Control MATLAB simulations • Monitor HFSS processes • View results in real-time</Text>
-          
-          {/* Status Indicators */}
-          <View style={styles.statusRow}>
-            <View style={styles.statusItem}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Ready</Text>
-            </View>
-            <View style={styles.statusItem}>
-              <Text style={styles.statusIcon}>⚡</Text>
-              <Text style={styles.statusText}>Powered</Text>
-            </View>
-          </View>
         </View>
       </LinearGradient>
 
@@ -80,7 +256,8 @@ const HomePage = () => {
         <View style={styles.actionSection}>
           <TouchableOpacity 
             style={styles.primaryCard}
-            onPress={() => navigateToPage('matlab')}
+            onPress={handleOptimizationPress}
+            disabled={checkingMatlabStatus}
             activeOpacity={0.8}
           >
             <LinearGradient
@@ -112,6 +289,56 @@ const HomePage = () => {
                   <Text style={styles.primaryCardFeature}>📈 Track Iterations</Text>
                   <Text style={styles.primaryCardFeature}>🎛️ Start/Stop Control</Text>
                 </View>
+                {checkingMatlabStatus && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                    <Text style={{ color: '#ffffff', marginLeft: 8, fontSize: 12 }}>Checking for active processes...</Text>
+                  </View>
+                )}
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progressive Tuning Card */}
+        <View style={styles.actionSection}>
+          <TouchableOpacity 
+            style={styles.primaryCard}
+            onPress={handleProgressiveTuningPress}
+            disabled={checkingTuningStatus}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#7c3aed', '#6d28d9', '#5b21b6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryCardGradient}
+            >
+              <View style={styles.primaryCardContent}>
+                <View style={styles.primaryCardHeader}>
+                  <View style={[styles.primaryCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <Text style={styles.primaryCardIconText}>📡</Text>
+                  </View>
+                  <View style={styles.primaryCardTexts}>
+                    <Text style={styles.primaryCardTitle}>Progressive Tuning</Text>
+                    <Text style={styles.primaryCardSubtitle}>Pre-optimize antenna parameters before MOEA/D</Text>
+                  </View>
+                  <View style={styles.primaryCardArrow}>
+                    <Text style={styles.primaryCardArrowText}>→</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.primaryCardFeatures}>
+                  <Text style={styles.primaryCardFeature}>🎯 3-Phase Tuning</Text>
+                  <Text style={styles.primaryCardFeature}>⚡ 3-7x Speedup</Text>
+                  <Text style={styles.primaryCardFeature}>📐 Range Tightening</Text>
+                </View>
+                {checkingTuningStatus && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                    <Text style={{ color: '#ffffff', marginLeft: 8, fontSize: 12 }}>Checking for active session...</Text>
+                  </View>
+                )}
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -168,42 +395,6 @@ const HomePage = () => {
           </View>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Platform Capabilities</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#3b82f6', '#1d4ed8']}
-                style={styles.statCardGradient}
-              >
-                <Text style={styles.statNumber}>∞</Text>
-                <Text style={styles.statLabel}>Projects</Text>
-              </LinearGradient>
-            </View>
-            
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                style={styles.statCardGradient}
-              >
-                <Text style={styles.statNumber}>24/7</Text>
-                <Text style={styles.statLabel}>Monitoring</Text>
-              </LinearGradient>
-            </View>
-            
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#f59e0b', '#d97706']}
-                style={styles.statCardGradient}
-              >
-                <Text style={styles.statNumber}>⚡</Text>
-                <Text style={styles.statLabel}>Fast Execute</Text>
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
       </ScrollView>
       </View>
     </View>
@@ -280,4 +471,4 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: 'rgba(255, 255, 255, 0.9)', fontWeight: '500', textAlign: 'center' },
 });
 
-export default HomePage;
+export default App;
