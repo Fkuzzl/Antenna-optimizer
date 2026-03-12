@@ -811,6 +811,18 @@ router.post('/apply-tightened-variables', async (req, res) => {
             }
         }
 
+        // ── Step 1b: Clear old Integrated_Results.xlsx so MOEA/D starts fresh ──
+        const excelPath = path.join(projectPath, 'Integrated_Results.xlsx');
+        if (fs.existsSync(excelPath)) {
+            try {
+                fs.unlinkSync(excelPath);
+                logger.info('Integrated_Results.xlsx cleared for fresh MOEA/D run');
+            } catch (xlErr) {
+                // Non-fatal: log and continue
+                logger.warn('Could not delete Integrated_Results.xlsx (continuing)', { error: xlErr.message });
+            }
+        }
+
         // ── Step 2: Generate F_Model_Element.m with tightened ranges ─────────
         const tmpFile = path.join(os.tmpdir(), `tightened_${Date.now()}.json`);
         fs.writeFileSync(tmpFile, JSON.stringify(tightenedRanges));
