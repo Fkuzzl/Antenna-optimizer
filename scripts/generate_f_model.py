@@ -172,101 +172,172 @@ Units = 'mm';
     
     return matlab_content
 
+def _write_matlab_file(output_file, content):
+    """Write MATLAB content to file, stripping read-only attribute on Windows if needed."""
+    if os.path.exists(output_file) and sys.platform == "win32":
+        import stat
+        try:
+            if not (os.stat(output_file).st_mode & stat.S_IWRITE):
+                print(f"⚠️ File is read-only, removing read-only attribute...")
+                os.chmod(output_file, stat.S_IWRITE | stat.S_IREAD)
+        except Exception as e:
+            print(f"❌ Could not remove read-only attribute: {e}")
+            raise
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except PermissionError:
+        print(f"❌ Permission denied: {output_file}")
+        print(f"   Close the file if open, or run: attrib -r \"{output_file}\"")
+        raise
+
+
+def generate_f_model_tightened(tightened_ranges):
+    """
+    Generate F_Model_Element.m from progressive tuning tightened ranges.
+
+    Seed domain is [-1, 1], so for physical range [lo, hi]:
+        multiplier = (hi - lo) / 2
+        offset     = (hi + lo) / 2
+
+    All entries in tightened_ranges are treated as optimization variables,
+    including variables that are normally 'locked' in the static config
+    (e.g. bluel) but were tuned during progressive tuning.
+    """
+    import json
+    if isinstance(tightened_ranges, str):
+        tightened_ranges = json.loads(tightened_ranges)
+
+    var_names    = list(tightened_ranges.keys())
+    n            = len(var_names)
+    timestamp    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    name_to_cfg  = {v['name']: v for v in VARIABLE_DEFINITIONS.values()}
+
+    lines = [
+        "function F_Model_Element(fid, seed, Units)",
+        "% Generated automatically by F_Model_Element Generator (Tightened Ranges Mode)",
+        f"% Timestamp: {timestamp}",
+        "% Source: Progressive Tuning tightened_ranges.csv",
+        f"% Variables: {n}  |  Seed domain: [-1, 1]",
+        "% Formula per variable: value = ((hi-lo)/2)*seed + (hi+lo)/2",
+        "",
+        "global numVar;",
+        f"numVar = {n};",
+        "Units = 'mm';",
+        "",
+        "% Variable mapping: index  name            [lo, hi]  ->  multiplier, offset",
+    ]
+
+    for i, name in enumerate(var_names, 1):
+        lo   = float(tightened_ranges[name][0])
+        hi   = float(tightened_ranges[name][1])
+        mult = (hi - lo) / 2.0
+        off  = (hi + lo) / 2.0
+        lines.append(f"% {i:2d}.  {name:12s}  [{lo:.4g}, {hi:.4g}]"
+                     f"  ->  mult={mult:.6g}, offset={off:.6g}")
+    lines.append("")
+
+    for i, name in enumerate(var_names, 1):
+        lo        = float(tightened_ranges[name][0])
+        hi        = float(tightened_ranges[name][1])
+        mult      = (hi - lo) / 2.0
+        off       = (hi + lo) / 2.0
+        cfg       = name_to_cfg.get(name, {})
+        precision = cfg.get('precision') or 3
+        units     = cfg.get('units', 'mm')
+        lines += [
+            f"Value{i} = {mult:.6g}*seed({i})+{off:.6g};",
+            f"num{i} = round(Value{i}, {precision});",
+            f"hfssChangeVar(fid,'{name}',num{i},'{units}');",
+            "",
+        ]
+
+    lines.append("end")
+    return "\n".join(lines) + "\n"
+
+
 def main():
-    """Main function to handle command line arguments and generate F_Model_Element.m"""
-    
+    """
+    Handle command-line arguments and generate F_Model_Element.m.
+
+    Standard mode (existing MOEA setup):
+        python generate_f_model.py <variable_ids_csv> [project_root]
+
+    Tightened-ranges mode (post progressive tuning):
+        python generate_f_model.py --tightened-file <json_path> <project_root>
+    """
     print(f"Execution ID {EXECUTION_ID}: Starting main function")
-    
+
+    # ── Tightened-ranges mode ────────────────────────────────────────────────
+    if len(sys.argv) == 4 and sys.argv[1] == '--tightened-file':
+        import json
+        try:
+            json_file    = sys.argv[2]
+            project_root = sys.argv[3]
+
+            if not os.path.exists(project_root):
+                print(f"Error: Project root not found: {project_root}")
+                sys.exit(1)
+
+            with open(json_file, 'r', encoding='utf-8') as f:
+                tightened_ranges = json.load(f)
+
+            print(f"Tightened-ranges mode: {len(tightened_ranges)} variables: "
+                  f"{list(tightened_ranges.keys())}")
+
+            matlab_content    = generate_f_model_tightened(tightened_ranges)
+            function_hfss_dir = os.path.join(project_root, 'Function', 'HFSS')
+            os.makedirs(function_hfss_dir, exist_ok=True)
+            output_file = os.path.abspath(os.path.join(function_hfss_dir, 'F_Model_Element.m'))
+            _write_matlab_file(output_file, matlab_content)
+            print(f"F_Model_Element.m (tightened) written to: {output_file}")
+        except Exception as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        return
+
+    # ── Standard mode ────────────────────────────────────────────────────────
     if len(sys.argv) not in [2, 3]:
-        print("Usage: python generate_f_model.py <variable_ids> [project_root]")
-        print("Example: python generate_f_model.py '1,2,3,4,5'")
-        print("Example: python generate_f_model.py '1,2,3,4,5' 'C:\\Users\\cheon\\Downloads\\MOEA_D_DE_0923'")
+        print("Usage (standard):  python generate_f_model.py <variable_ids> [project_root]")
+        print("Usage (tightened): python generate_f_model.py --tightened-file <json_path> <project_root>")
         sys.exit(1)
-    
+
     try:
         variable_ids_str = sys.argv[1]
         print(f"Processing variable IDs: {variable_ids_str}")
-        
-        # Determine project root
+
         if len(sys.argv) == 3:
-            # Use provided project root path
             project_root = sys.argv[2]
             print(f"Using provided project root: {project_root}")
         else:
-            # Fall back to parent of scripts directory (backward compatibility)
             project_root = os.path.dirname(os.path.dirname(__file__))
             print(f"Using default project root: {project_root}")
-        
-        # Validate project root exists
+
         if not os.path.exists(project_root):
             print(f"Error: Project root directory does not exist: {project_root}")
             sys.exit(1)
-        
-        # Generate MATLAB content
-        matlab_content = generate_f_model_element(variable_ids_str)
-        variable_count = len([x for x in variable_ids_str.split(',') if x.strip()])
-        
-        # Count ground plane variables for reporting
-        ids_list = [int(x.strip()) for x in variable_ids_str.split(',') if x.strip()]
-        ground_plane_count = sum(1 for vid in ids_list if VARIABLE_DEFINITIONS.get(vid, {}).get('category') == 'ground_plane')
+
+        matlab_content     = generate_f_model_element(variable_ids_str)
+        variable_count     = len([x for x in variable_ids_str.split(',') if x.strip()])
+        ids_list           = [int(x.strip()) for x in variable_ids_str.split(',') if x.strip()]
+        ground_plane_count = sum(1 for vid in ids_list
+                                 if VARIABLE_DEFINITIONS.get(vid, {}).get('category') == 'ground_plane')
         optimization_count = variable_count - ground_plane_count
-        
-        # Create Function/HFSS directory if it doesn't exist
+
         function_hfss_dir = os.path.join(project_root, 'Function', 'HFSS')
         os.makedirs(function_hfss_dir, exist_ok=True)
         print(f"Created/verified directory: {function_hfss_dir}")
-        
-        # Set output file path in Function\HFSS directory
-        output_file = os.path.join(function_hfss_dir, 'F_Model_Element.m')
-        output_file = os.path.abspath(output_file)
-        
-        # Also check for .mlx file
-        output_file_mlx = os.path.join(function_hfss_dir, 'F_Model_Element.mlx')
-        output_file_mlx = os.path.abspath(output_file_mlx)
-        
-        # Create the new F_Model_Element.m file
-        # Note: All backup and deletion of old files is handled by manage_optimization_data.py
+
+        output_file = os.path.abspath(os.path.join(function_hfss_dir, 'F_Model_Element.m'))
         print("Creating new F_Model_Element.m file...")
-        
-        # Handle read-only files by removing read-only attribute
-        if os.path.exists(output_file):
-            try:
-                # On Windows, remove read-only attribute if present
-                if sys.platform == "win32":
-                    import stat
-                    current_mode = os.stat(output_file).st_mode
-                    if not (current_mode & stat.S_IWRITE):
-                        print(f"⚠️ File is read-only, removing read-only attribute...")
-                        os.chmod(output_file, stat.S_IWRITE | stat.S_IREAD)
-                        print(f"✅ Read-only attribute removed")
-            except Exception as perm_error:
-                print(f"❌ Could not remove read-only attribute: {perm_error}")
-                print(f"   Please manually remove read-only attribute from:")
-                print(f"   {output_file}")
-                raise
-        
-        # Write new file to Function\HFSS directory
-        try:
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(matlab_content)
-        except PermissionError as e:
-            print(f"❌ Permission denied when writing file")
-            print(f"   File: {output_file}")
-            print(f"   Possible causes:")
-            print(f"   1. File is open in MATLAB or another editor")
-            print(f"   2. File is read-only (check Properties > Attributes)")
-            print(f"   3. Antivirus is blocking the write operation")
-            print(f"   4. Insufficient user permissions")
-            print(f"   Solution: Close the file if it's open, or run: attrib -r \"{output_file}\"")
-            raise
-        
+        _write_matlab_file(output_file, matlab_content)
+
         print(f"F_Model_Element.m generated successfully")
         print(f"Output file: {output_file}")
-        print(f"Total variables selected: {variable_count}")
-        print(f"Optimization variables: {optimization_count}")
-        print(f"Ground plane variables: {ground_plane_count}")
+        print(f"Total variables: {variable_count}  |  Optimization: {optimization_count}"
+              f"  |  Ground plane: {ground_plane_count}")
         print(f"Seed range: 1-{optimization_count}")
-        
+
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)

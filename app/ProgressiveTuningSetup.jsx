@@ -87,7 +87,7 @@ function isAntennaInsideDxf(ax, ay, dxfGndData) {
   ].every(([px, py]) => isPointInsideDxf(px, py, dxfGndData));
 }
 
-export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProjectPath, onStart }) {
+export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProjectPath, onStart, onRunMoead }) {
   // ---- Step 1: Project Location ----
   const [localProjectPath, setLocalProjectPath] = useState(projectPath || '');
   const [projectLocationConfirmed, setProjectLocationConfirmed] = useState(!!projectPath);
@@ -827,7 +827,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
         statusData={viewingResult}
         onBack={() => setViewingResult(null)}
         onRerun={() => setViewingResult(null)}
-        onRunMoead={() => setViewingResult(null)}
+        onRunMoead={onRunMoead}
       />
     );
   }

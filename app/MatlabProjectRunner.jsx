@@ -6,7 +6,7 @@ import AntennaVariableSelector from './AntennaVariableSelector';
 import SimulationResultsViewer from './SimulationResultsViewer';
 import AppConfig, { validateConfig, PathUtils, showAlert } from './app_config';
 
-export default function MatlabProjectRunner({ onBack, initialProjectPath = '' }) {
+export default function MatlabProjectRunner({ onBack, initialProjectPath = '', autoStart = false }) {
   const [filePath, setFilePath] = useState(initialProjectPath);
   const [isLoading, setIsLoading] = useState(false);
   const [isTerminating, setIsTerminating] = useState(false);
@@ -29,6 +29,9 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
   // Loading panel state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+
+  // Auto-start ref: fires handleRunProject once initialisation completes (used by tuning flow)
+  const autoStartRef = useRef(autoStart);
   
   // New state for iteration tracking
   const [iterationData, setIterationData] = useState({
@@ -49,7 +52,7 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
   useEffect(() => {
     if (initialProjectPath && initialProjectPath.trim()) {
       setProjectLocationConfirmed(true);
-      setLocationValidationMessage('✅ Project location loaded from tuning results');
+      setLocationValidationMessage('Project location loaded from tuning results');
     }
   }, [initialProjectPath]);
 
@@ -454,14 +457,14 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
       const isLinuxPath = filePath.startsWith('/');
 
       if (!isWindowsPath && !isLinuxPath) {
-        setLocationValidationMessage('❌ Path format not recognized. Please use full path');
+        setLocationValidationMessage('Path format not recognized. Please use full path');
         setIsValidatingLocation(false);
         return;
       }
 
       // Accept the path as valid
       setProjectLocationConfirmed(true);
-      setLocationValidationMessage('✅ Project location validated successfully');
+      setLocationValidationMessage('Project location validated successfully');
       await savePathToHistory(filePath);
 
       // Create/update integrated Excel file after path validation
@@ -476,7 +479,7 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
 
     } catch (error) {
       console.error('Error validating location:', error);
-      setLocationValidationMessage('❌ Validation failed');
+      setLocationValidationMessage('Validation failed');
     }
 
     setIsValidatingLocation(false);
@@ -1114,6 +1117,15 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
     }
   };
 
+  // Auto-start: when navigated here from progressive tuning, launch as soon as ready
+  useEffect(() => {
+    if (!autoStartRef.current) return;
+    if (!isInitialLoading && projectLocationConfirmed && !executionState.isRunning) {
+      autoStartRef.current = false; // prevent double-fire
+      handleRunProject();
+    }
+  }, [isInitialLoading, projectLocationConfirmed]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStopMatlab = async () => {
     // Clear the stop button timer if it's still running
     if (stopButtonTimerRef.current) {
@@ -1569,14 +1581,14 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '' })
             {locationValidationMessage && (
               <View style={[
                 styles.validationMessage,
-                locationValidationMessage.includes('✅') && styles.validationSuccess,
-                locationValidationMessage.includes('âŒ') && styles.validationError
+                (locationValidationMessage.includes('loaded from tuning') || locationValidationMessage.includes('validated successfully')) && styles.validationSuccess,
+                (locationValidationMessage.includes('not recognized') || locationValidationMessage.includes('failed')) && styles.validationError
               ]}>
                 <View style={styles.validationContent}>
                   <Text style={[
                     styles.validationText,
-                    locationValidationMessage.includes('✅') && styles.validationTextSuccess,
-                    locationValidationMessage.includes('âŒ') && styles.validationTextError
+                    (locationValidationMessage.includes('loaded from tuning') || locationValidationMessage.includes('validated successfully')) && styles.validationTextSuccess,
+                    (locationValidationMessage.includes('not recognized') || locationValidationMessage.includes('failed')) && styles.validationTextError
                   ]}>
                     {locationValidationMessage}
                   </Text>

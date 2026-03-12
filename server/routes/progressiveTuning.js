@@ -396,6 +396,33 @@ router.get('/run-result', async (req, res) => {
 
         // Merge: status.json is authoritative for phase data; profile fills in metadata
         const merged = { ...profileData, ...statusData, _runPath: runPath };
+
+        // If tightened_ranges not in either JSON, try parsing tightened_ranges.csv
+        if (!merged.tightened_ranges || Object.keys(merged.tightened_ranges).length === 0) {
+            const csvPath = path.join(runPath, 'tightened_ranges.csv');
+            if (fs.existsSync(csvPath)) {
+                try {
+                    const csvText = fs.readFileSync(csvPath, 'utf8');
+                    const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+                    const tightened = {};
+                    for (const line of lines) {
+                        const parts = line.split(',').map(s => s.trim());
+                        if (parts.length < 3) continue;
+                        const [name, lo, hi] = parts;
+                        const loNum = parseFloat(lo);
+                        const hiNum = parseFloat(hi);
+                        if (isNaN(loNum) || isNaN(hiNum)) continue; // skip header rows
+                        tightened[name] = [loNum, hiNum];
+                    }
+                    if (Object.keys(tightened).length > 0) {
+                        merged.tightened_ranges = tightened;
+                    }
+                } catch (csvErr) {
+                    logger.warn('[ProgressiveTuning] Failed to parse tightened_ranges.csv', { error: csvErr.message });
+                }
+            }
+        }
+
         res.json(createResponse(true, merged));
 
     } catch (error) {

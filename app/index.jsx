@@ -153,6 +153,36 @@ const HomePage = () => {
     setCurrentPage('progressiveTuningSetup');
   }, [isMatlabOptimizationRunning, showBusy]);
 
+  /**
+   * Apply tightened variable ranges from progressive tuning, then open MOEA/D runner.
+   * Seed domain is [-1, 1]: the server rewrites F_Model_Element.m with the narrowed
+   * multiplier/offset. F_GND_Import.m is left untouched (set during tuning setup).
+   */
+  const handleRunMoeadWithTightened = useCallback(async (results) => {
+    if (!results?.tightened_ranges || Object.keys(results.tightened_ranges).length === 0) {
+      modalAlert('No Tightened Ranges', 'No tightened ranges were found in the results. Cannot set up MOEA/D.');
+      return;
+    }
+    try {
+      const response = await fetch(`${AppConfig.serverUrl}/api/matlab/apply-tightened-variables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectPath: tuningProjectPath,
+          tightenedRanges: results.tightened_ranges,
+          gndConfig: results.GND_config || results.gnd_config || results.manager?.gndConfig || null,
+        }),
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || 'Server error');
+      // Update the stored project path in case it was resolved server-side
+      if (data.projectPath) setTuningProjectPath(data.projectPath);
+      setCurrentPage('matlabFromTuning');
+    } catch (err) {
+      modalAlert('Setup Failed', `Could not apply tightened ranges:\n${err.message}`);
+    }
+  }, [tuningProjectPath, modalAlert]);
+
   // Navigation functions
   const navigateToPage = (page) => {
     setCurrentPage(page);
@@ -168,7 +198,7 @@ const HomePage = () => {
   }
 
   if (currentPage === 'matlabFromTuning') {
-    return <MatlabProjectRunner onBack={navigateHome} initialProjectPath={tuningProjectPath} />;
+    return <MatlabProjectRunner onBack={navigateHome} initialProjectPath={tuningProjectPath} autoStart={true} />;
   }
 
   if (currentPage === 'settings') {
@@ -186,6 +216,7 @@ const HomePage = () => {
         projectPath={tuningProjectPath}
         onSetProjectPath={setTuningProjectPath}
         onStart={() => setCurrentPage('progressiveTuningProgress')}
+        onRunMoead={handleRunMoeadWithTightened}
       />
     );
   }
@@ -208,10 +239,7 @@ const HomePage = () => {
       <ProgressiveTuningResults
         onBack={navigateHome}
         statusData={tuningResultsData}
-        onRunMoead={(results) => {
-          // Navigate to MATLAB runner pre-filled with the tuning project path
-          setCurrentPage('matlabFromTuning');
-        }}
+        onRunMoead={handleRunMoeadWithTightened}
         onRerun={() => {
           setTuningResultsData(null);
           setCurrentPage('progressiveTuningSetup');

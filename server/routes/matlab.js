@@ -741,4 +741,178 @@ router.post('/apply-variables', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/matlab/apply-tightened-variables
+ * Prepares the MOEA project for a run using tightened ranges from progressive tuning:
+ *   1. Backs up the existing Optimization/ directory if present.
+ *   2. Regenerates F_Model_Element.m with the tightened variable ranges.
+ *   3. Regenerates F_GND_Import.m (DXF mode) or patches GND parameters into
+ *      F_Model_Element.m (parametric mode) using the profile's GND_config.
+ *
+ * Body: {
+ *   projectPath: string,
+ *   tightenedRanges: { varName: [min, max], ... },
+ *   gndConfig: { use_DXF: bool, Lgx, Lgy, xPos, yPos, dxf_file_path? } | null
+ * }
+ */
+router.post('/apply-tightened-variables', async (req, res) => {
+    const { promisify } = require('util');
+    const execAsync = promisify(require('child_process').exec);
+    const os = require('os');
+    try {
+        let { projectPath, tightenedRanges, gndConfig } = req.body;
+
+        // Fallback: if client didn't supply a path use the path the progressive
+        // tuning manager already knows about.
+        if (!projectPath || !projectPath.trim()) {
+            projectPath = progressiveTuningManager.getState().projectPath || '';
+        }
+
+        if (!projectPath || typeof projectPath !== 'string') {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath string is required')
+            );
+        }
+        if (!tightenedRanges || typeof tightenedRanges !== 'object' ||
+            Object.keys(tightenedRanges).length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'tightenedRanges object with at least one variable is required')
+            );
+        }
+        if (!fs.existsSync(projectPath)) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json(
+                createResponse(false, null, `Project path not found: ${projectPath}`)
+            );
+        }
+
+        const varNames = Object.keys(tightenedRanges);
+        logger.info('apply-tightened-variables: starting', { projectPath, variables: varNames, gndConfig });
+
+        let setupConfig;
+        try {
+            setupConfig = require(path.join(__dirname, '..', '..', 'OPEN_THIS', 'SETUP', 'setup_loader'));
+        } catch {
+            logger.warn('Setup config not found, using default python');
+        }
+        const pythonExecutable = setupConfig ? setupConfig.getPythonExecutable() : 'python';
+
+        // ── Step 1: Backup existing Optimization/ directory ──────────────────
+        const optimizationDir = path.join(projectPath, 'Optimization');
+        if (fs.existsSync(optimizationDir)) {
+            const backupScript = path.join(__dirname, '..', '..', 'scripts', 'manage_optimization_data.py');
+            try {
+                const { stdout: bkOut } = await execAsync(
+                    `"${pythonExecutable}" "${backupScript}" "backup-and-remove" "${projectPath}"`
+                );
+                logger.info('Optimization directory backed up', { stdout: bkOut.trim() });
+            } catch (bkErr) {
+                // Non-fatal: log and continue
+                logger.warn('Optimization backup warning (continuing)', { error: bkErr.message });
+            }
+        }
+
+        // ── Step 2: Generate F_Model_Element.m with tightened ranges ─────────
+        const tmpFile = path.join(os.tmpdir(), `tightened_${Date.now()}.json`);
+        fs.writeFileSync(tmpFile, JSON.stringify(tightenedRanges));
+        const fModelScript = path.join(__dirname, '..', '..', 'scripts', 'generate_f_model.py');
+        try {
+            const { stdout, stderr } = await execAsync(
+                `"${pythonExecutable}" "${fModelScript}" --tightened-file "${tmpFile}" "${projectPath}"`
+            );
+            if (stderr) logger.warn('Python stderr (F_Model)', { stderr });
+            logger.info('F_Model_Element.m (tightened) generated', { variables: varNames, stdout: stdout.trim() });
+        } finally {
+            try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+        }
+
+        // ── Step 3: Apply GND config ──────────────────────────────────────────
+        if (gndConfig && typeof gndConfig === 'object') {
+            const { use_DXF, Lgx, Lgy, xPos, yPos, dxf_file_path } = gndConfig;
+
+            if (use_DXF) {
+                // DXF mode: regenerate F_GND_Import.m for this profile's DXF file
+                if (!dxf_file_path) {
+                    logger.warn('GND config has use_DXF=true but no dxf_file_path, skipping GND step');
+                } else {
+                    const gndScript = path.join(__dirname, '..', '..', 'scripts', 'generate_gnd_import.py');
+                    try {
+                        const { stdout: gndOut, stderr: gndErr } = await execAsync(
+                            `"${pythonExecutable}" "${gndScript}" "${dxf_file_path}" "${parseFloat(xPos)}" "${parseFloat(yPos)}" "${projectPath}"`
+                        );
+                        if (gndErr) logger.warn('Python stderr (GND import)', { gndErr });
+                        logger.info('F_GND_Import.m regenerated (DXF mode)', { dxf: dxf_file_path, stdout: gndOut.trim() });
+                    } catch (gndErr) {
+                        logger.warn('F_GND_Import.m generation failed (continuing)', { error: gndErr.message });
+                    }
+                }
+            } else {
+                // Parametric mode: patch Lgx/Lgy/GND_xPos/GND_yPos into F_Model_Element.m
+                const fModelPath = path.join(projectPath, 'Function', 'HFSS', 'F_Model_Element.m');
+                if (fs.existsSync(fModelPath)) {
+                    try {
+                        let content = fs.readFileSync(fModelPath, 'utf8');
+                        const lgxVal  = parseFloat(Lgx);
+                        const lgyVal  = parseFloat(Lgy);
+                        const xPosVal = parseFloat(xPos);
+                        const yPosVal = parseFloat(yPos);
+
+                        // Update existing var or insert before 'end'
+                        // Update existing vars first
+                        const pairs = [
+                            ['Lgx',     lgxVal],
+                            ['Lgy',     lgyVal],
+                            ['GND_xPos', xPosVal],
+                            ['GND_yPos', yPosVal],
+                        ];
+                        const toInsert = [];
+                        for (const [varName, val] of pairs) {
+                            const rx = new RegExp(`^${varName} = [\\d.]+;`, 'm');
+                            if (rx.test(content)) {
+                                content = content.replace(rx, `${varName} = ${val};`);
+                            } else {
+                                toInsert.push({ varName, val });
+                            }
+                        }
+                        // Insert all missing vars as a single block before 'end'
+                        if (toInsert.length > 0) {
+                            const block = [
+                                '',
+                                '% Ground plane parameters (from progressive tuning profile)',
+                                ...toInsert.flatMap(({ varName, val }) => [
+                                    `${varName} = ${val};`,
+                                    `hfssChangeVar(fid,'${varName}',${varName},'mm');`,
+                                    '',
+                                ]),
+                            ].join('\n');
+                            content = content.replace(/^end\s*$/m, `${block}\nend`);
+                        }
+
+                        fs.writeFileSync(fModelPath, content, 'utf8');
+                        logger.info('Parametric GND vars patched into F_Model_Element.m',
+                            { Lgx: lgxVal, Lgy: lgyVal, GND_xPos: xPosVal, GND_yPos: yPosVal });
+                    } catch (gndErr) {
+                        logger.warn('Parametric GND patch failed (continuing)', { error: gndErr.message });
+                    }
+                } else {
+                    logger.warn('F_Model_Element.m not found for GND parametric patch', { fModelPath });
+                }
+            }
+        } else {
+            logger.info('No GND config provided — F_GND_Import.m left untouched');
+        }
+
+        res.json({
+            success: true,
+            message: `F_Model_Element.m generated with ${varNames.length} tightened variables`,
+            variables: varNames,
+            projectPath,  // return resolved path so client can sync its state
+        });
+    } catch (error) {
+        logger.error('Error in apply-tightened-variables', { error: error.message, stack: error.stack });
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, `Failed to apply tightened variables: ${error.message}`)
+        );
+    }
+});
+
 module.exports = router;

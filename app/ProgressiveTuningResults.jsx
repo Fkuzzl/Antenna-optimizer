@@ -31,6 +31,7 @@ export default function ProgressiveTuningResults({
   const [isLoading, setIsLoading] = useState(!statusData);
   const [error, setError] = useState(null);
   const [outputFiles, setOutputFiles] = useState([]);
+  const [isStartingMoead, setIsStartingMoead] = useState(false);
 
   const SERVER_URL = AppConfig.serverUrl;
 
@@ -421,11 +422,18 @@ export default function ProgressiveTuningResults({
 
           {/* Run MOEA/D with tightened ranges */}
           <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => {
-              if (onRunMoead) onRunMoead(results);
+            style={[styles.actionCard, isStartingMoead && { opacity: 0.7 }]}
+            onPress={async () => {
+              if (!onRunMoead || isStartingMoead) return;
+              setIsStartingMoead(true);
+              try {
+                await onRunMoead(results);
+              } finally {
+                setIsStartingMoead(false);
+              }
             }}
             activeOpacity={0.8}
+            disabled={isStartingMoead}
           >
             <LinearGradient
               colors={['#7c3aed', '#6d28d9']}
@@ -433,12 +441,19 @@ export default function ProgressiveTuningResults({
               end={{ x: 1, y: 0 }}
               style={styles.actionCardGradient}
             >
-              <Text style={styles.actionCardIcon}>🚀</Text>
+              {isStartingMoead
+                ? <ActivityIndicator color="#ffffff" style={{ marginRight: 12 }} />
+                : <Text style={styles.actionCardIcon}>🚀</Text>
+              }
               <View style={styles.actionCardText}>
-                <Text style={styles.actionCardTitle}>Run MOEA/D with Tightened Ranges</Text>
-                <Text style={styles.actionCardSubtitle}>~50-100 sims, ~4-8 hours</Text>
+                <Text style={styles.actionCardTitle}>
+                  {isStartingMoead ? 'Setting up MOEA/D...' : 'Run MOEA/D with Tightened Ranges'}
+                </Text>
+                <Text style={styles.actionCardSubtitle}>
+                  {isStartingMoead ? 'Generating F_Model_Element.m' : '~50-100 sims, ~4-8 hours'}
+                </Text>
               </View>
-              <Text style={styles.actionCardArrow}>→</Text>
+              {!isStartingMoead && <Text style={styles.actionCardArrow}>→</Text>}
             </LinearGradient>
           </TouchableOpacity>
 
