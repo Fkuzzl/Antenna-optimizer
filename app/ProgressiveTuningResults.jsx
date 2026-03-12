@@ -407,13 +407,20 @@ export default function ProgressiveTuningResults({
             { key: 'chart_ar.png',    label: 'Axial Ratio' },
             { key: 'chart_gain.png',  label: 'Realized Gain' },
             { key: 'chart_smith.png', label: 'Smith Chart (S11 Locus)' },
-          ].map(({ key, label }) => (
-            <ChartCard
-              key={key}
-              url={`${SERVER_URL}/api/progressive-tuning/chart/${key}${results?.results_dir ? `?dir=${encodeURIComponent(results.results_dir)}` : ''}`}
-              label={label}
-            />
-          ))}
+          ].map(({ key, label }) => {
+            // Prefer _runPath (set by server to the real current disk path) over
+            // results_dir (an absolute path baked into status.json / profile.json
+            // on the original PC — stale when the project folder is copied to a
+            // new machine with a different path).
+            const chartDir = results?._runPath || results?.results_dir;
+            return (
+              <ChartCard
+                key={key}
+                url={`${SERVER_URL}/api/progressive-tuning/chart/${key}${chartDir ? `?dir=${encodeURIComponent(chartDir)}` : ''}`}
+                label={label}
+              />
+            );
+          })}
         </View>
 
         {/* Action Buttons */}
