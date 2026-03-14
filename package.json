@@ -1,6 +1,8 @@
 {
   "name": "Antenna-optimizer",
   "version": "1.0.0",
+  "description": "Antenna optimizer desktop and mobile control app with MATLAB/HFSS integration",
+  "author": "Mario Ma",
   "main": "expo-router/entry",
   "scripts": {
     "postinstall": "echo \"\n✅ Dependencies installed! Next: npm run setup\"",
@@ -14,9 +16,10 @@
     "kill-server": "taskkill /F /IM node.exe 2>nul || echo No Node.js processes found",
     "check-connections": "netstat -an | findstr :3001",
     "desktop:dev": "concurrently -k -n SERVER,WEB,ELECTRON -c green,blue,magenta \"npm run server\" \"npm run web -- --port 8081 --host localhost\" \"wait-on tcp:3001 http://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 electron electron/main.js\"",
+    "desktop:clean": "node scripts/clean-electron-build.js",
     "desktop:web:build": "expo export --platform web --output-dir dist-web",
-    "desktop:pack:win": "npm run desktop:web:build && electron-builder --win nsis",
-    "desktop:pack:dir": "npm run desktop:web:build && electron-builder --win dir"
+    "desktop:pack:win": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
+    "desktop:pack:dir": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win dir"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -66,7 +69,8 @@
       "config/**/*",
       "Function/**/*",
       "OPEN_THIS/SETUP/setup_loader.js",
-      "OPEN_THIS/SETUP/setup_variable.json",
+      "OPEN_THIS/SETUP/requirements.txt",
+      "OPEN_THIS/SETUP/setup_variable.template.json",
       "package.json"
     ],
     "directories": {
@@ -76,10 +80,15 @@
       "main": "electron/main.js"
     },
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ],
       "artifactName": "Antenna-Optimizer-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "deleteAppDataOnUninstall": true,
+      "include": "build/installer.nsh"
     }
   }
 }

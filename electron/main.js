@@ -140,7 +140,13 @@ function persistSetupConfig({ matlabPath, pythonPath, hfssPath }) {
 
 function parseRequiredPythonPackages(requirementsPath) {
   if (!fs.existsSync(requirementsPath)) {
-    throw new Error(`Python requirements file not found: ${requirementsPath}`);
+    return [
+      { raw: 'pandas>=2.0.0', packageName: 'pandas' },
+      { raw: 'numpy>=1.24.0', packageName: 'numpy' },
+      { raw: 'openpyxl>=3.1.0', packageName: 'openpyxl' },
+      { raw: 'ezdxf>=1.0.0', packageName: 'ezdxf' },
+      { raw: 'python-dateutil>=2.8.0', packageName: 'python-dateutil' }
+    ];
   }
 
   const content = fs.readFileSync(requirementsPath, 'utf8');
@@ -337,6 +343,17 @@ function openSetupWizardWindow() {
     return Promise.reject(new Error('Setup wizard is already running'));
   }
 
+  const wizardHtmlPath = path.join(__dirname, 'setup-wizard.html');
+  const wizardPreloadPath = path.join(__dirname, 'setupWizardPreload.js');
+
+  if (!fs.existsSync(wizardHtmlPath)) {
+    return Promise.reject(new Error(`Setup wizard UI file is missing: ${wizardHtmlPath}`));
+  }
+
+  if (!fs.existsSync(wizardPreloadPath)) {
+    return Promise.reject(new Error(`Setup wizard preload file is missing: ${wizardPreloadPath}`));
+  }
+
   const wizardWindow = new BrowserWindow({
     width: 980,
     height: 720,
@@ -347,11 +364,41 @@ function openSetupWizardWindow() {
     autoHideMenuBar: true,
     modal: !!mainWindow,
     parent: mainWindow || undefined,
+    show: false,
+    backgroundColor: '#f3f6fb',
     webPreferences: {
-      preload: path.join(__dirname, 'setupWizardPreload.js'),
+      preload: wizardPreloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
+    }
+  });
+
+  wizardWindow.once('ready-to-show', () => {
+    wizardWindow.show();
+  });
+
+  wizardWindow.webContents.on('did-fail-load', async (_event, errorCode, errorDescription, validatedURL) => {
+    const detail = `Failed to load setup wizard window.\n\nCode: ${errorCode}\nReason: ${errorDescription}\nURL: ${validatedURL || '(none)'}`;
+    console.error('[electron] Setup wizard failed to load', {
+      errorCode,
+      errorDescription,
+      validatedURL,
+      wizardHtmlPath,
+      wizardPreloadPath
+    });
+
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'Setup Wizard Error',
+      message: 'Unable to open setup wizard.',
+      detail,
+      buttons: ['Close'],
+      noLink: true
+    });
+
+    if (!wizardWindow.isDestroyed()) {
+      wizardWindow.close();
     }
   });
 
@@ -379,11 +426,31 @@ function openSetupWizardWindow() {
       }
     });
 
-    wizardWindow.loadFile(path.join(__dirname, 'setup-wizard.html')).catch((error) => {
+    wizardWindow.loadFile(wizardHtmlPath).catch(async (error) => {
+      console.error('[electron] Failed to load setup wizard HTML', {
+        error: error?.message || String(error),
+        wizardHtmlPath,
+        wizardPreloadPath
+      });
+
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Setup Wizard Error',
+        message: 'Unable to open setup wizard UI.',
+        detail: `${error?.message || String(error)}\n\nUI path: ${wizardHtmlPath}\nPreload path: ${wizardPreloadPath}`,
+        buttons: ['Close'],
+        noLink: true
+      });
+
       if (setupWizardSession && !setupWizardSession.finished) {
         setupWizardSession.finished = true;
         setupWizardSession = null;
       }
+
+      if (!wizardWindow.isDestroyed()) {
+        wizardWindow.close();
+      }
+
       reject(error);
     });
   });
