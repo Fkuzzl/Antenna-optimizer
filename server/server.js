@@ -86,7 +86,11 @@ app.get('/api/server/config', (req, res) => {
 
 // API Routes
 app.use('/api/integrated-results', resultsRoutes);
-app.use('/api/simulation', resultsRoutes); // For /api/simulation/results endpoint
+// Backward-compat: only expose the /results endpoint under /api/simulation, not all results routes
+app.post('/api/simulation/results', (req, res, next) => {
+    req.url = '/results';
+    resultsRoutes(req, res, next);
+});
 app.use('/api/matlab', matlabRoutes);
 app.use('/api/variables', variablesRoutes);
 app.use('/api/matlab', groundPlaneRoutes);

@@ -91,7 +91,12 @@ class WebSocketManager {
                     // Client responding to our heartbeat - already updated lastHeartbeat above
                     break;
                 case 'subscribe':
-                    // Handle subscription logic
+                    // Acknowledge subscription
+                    this.sendToClient(connectionId, {
+                        type: 'subscribed',
+                        topics: data.topics || [],
+                        timestamp: new Date().toISOString(),
+                    });
                     break;
                 default:
                     logger.warn(`Unknown message type: ${data.type}`);

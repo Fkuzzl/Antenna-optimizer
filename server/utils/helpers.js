@@ -26,8 +26,11 @@ const sanitizeError = (error) => {
     const message = typeof error === 'string' ? error : (error.message || 'Unknown error');
     
     // Remove file paths (Windows and Unix)
+    // Windows: C:\Users\... style paths
     let sanitized = message.replace(/[A-Za-z]:\\[\w\\\-\. ]+/g, '[path]');
-    sanitized = sanitized.replace(/\/[\w\/\-\. ]+/g, '[path]');
+    // Unix: multi-level filesystem paths — require at least 2 slash-separated components
+    // and must NOT be preceded by '/' or ':' (avoids matching URL paths like /api/matlab/status)
+    sanitized = sanitized.replace(/(?<![/:])((?:\/[\w][\w\-\.]*){2,})/g, '[path]');
     
     // Remove Python stack traces
     sanitized = sanitized.replace(/File ".*?", line \d+.*/g, '');

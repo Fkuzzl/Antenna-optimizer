@@ -15,6 +15,19 @@ const { HTTP_STATUS, FILES } = require('../config/constants');
 const logger = require('../config/logger');
 
 /**
+ * Returns the Python executable path from setup config, falling back to 'python'.
+ * Mirrors the pattern used in optimization.js, matlab.js, etc.
+ */
+const getPythonExecutable = () => {
+    try {
+        const setupConfig = require(path.join(__dirname, '..', '..', 'OPEN_THIS', 'SETUP', 'setup_loader'));
+        return setupConfig.getPythonExecutable();
+    } catch {
+        return 'python';
+    }
+};
+
+/**
  * POST /api/integrated-results/read-page
  * Read paginated simulation results from Excel file
  */
@@ -72,12 +85,12 @@ router.post('/update', validateProjectPath, async (req, res) => {
             // Excel doesn't exist - create it with all CSV data
             logger.info('Excel file not found, creating with all data...');
             scriptPath = path.join(__dirname, '..', '..', 'scripts', 'integrated_results_manager.py');
-            pythonCmd = `python "${scriptPath}" create --project-path "${projectPath}"`;
+            pythonCmd = `"${getPythonExecutable()}" "${scriptPath}" create --project-path "${projectPath}"`;
         } else {
             // Excel exists - incrementally append new iterations
             logger.info('Excel file exists, appending new iterations...');
             scriptPath = path.join(__dirname, '..', '..', 'scripts', 'update_excel_incremental.py');
-            pythonCmd = `python "${scriptPath}" --project-path "${projectPath}"`;
+            pythonCmd = `"${getPythonExecutable()}" "${scriptPath}" --project-path "${projectPath}"`;
         }
 
         exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
@@ -111,7 +124,7 @@ router.post('/create', validateProjectPath, async (req, res) => {
 
         // Run Python script to create Excel
         const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'integrated_results_manager.py');
-        const pythonCmd = `python "${scriptPath}" create --project-path "${projectPath}"`;
+        const pythonCmd = `"${getPythonExecutable()}" "${scriptPath}" create --project-path "${projectPath}"`;
 
         exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
             if (error) {
@@ -142,7 +155,7 @@ router.post('/clear', validateProjectPath, async (req, res) => {
         logger.info(`Clearing integrated Excel for project: ${projectPath}`);
 
         const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'integrated_results_manager.py');
-        const pythonCmd = `python "${scriptPath}" clear --project-path "${projectPath}"`;
+        const pythonCmd = `"${getPythonExecutable()}" "${scriptPath}" clear --project-path "${projectPath}"`;
 
         exec(pythonCmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
             if (error) {

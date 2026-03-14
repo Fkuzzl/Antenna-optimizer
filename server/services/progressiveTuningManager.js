@@ -22,12 +22,12 @@ const { PROCESS_STATES } = require('../config/constants');
 
 // Default tuning variable configuration
 const DEFAULT_TUNING_VARIABLES = {
-    probex: { value: 2.6,   unit: 'mm',  min: 2.0,   max: 4.5,   description: 'Feed probe position' },
-    purple: { value: 1.2,   unit: 'mm',  min: 0.5,   max: 2.5,   description: 'Impedance matching strip' },
-    ngreen: { value: 0.32,  unit: 'mm',  min: 0.1,   max: 0.4,   description: 'Half-sphere cut size' },
+    probex: { value: 2.1,   unit: 'mm',  min: 1.5,   max: 4.5,   description: 'Feed probe position' },
+    purple: { value: 1.2,   unit: 'mm',  min: 0.5,   max: 3.0,   description: 'Impedance matching strip' },
+    ngreen: { value: 0.2,   unit: 'mm',  min: 0.1,   max: 0.4,   description: 'Half-sphere cut size' },
     orange: { value: 30,    unit: 'deg', min: 10,    max: 90,    description: 'L3 arm angle (CP loop)' },
-    orange2:{ value: 66,    unit: 'deg', min: 10,    max: 90,    description: 'L4 arm angle (CP loop)' },
-    brown:  { value: 0.85,  unit: 'mm',  min: 0.1,   max: 1.5,   description: 'T-strip gap' },
+    orange2:{ value: 55,    unit: 'deg', min: 10,    max: 90,    description: 'L4 arm angle (CP loop)' },
+    brown:  { value: 1.6,   unit: 'mm',  min: 0.5,   max: 1.7,   description: 'T-strip gap' },
     bluel:  { value: 10.54, unit: 'mm',  min: 10.39, max: 10.60, description: 'Blue-L patch length' },
 };
 

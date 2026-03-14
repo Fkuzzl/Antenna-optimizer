@@ -16,8 +16,8 @@ const ANTENNA_SIZE = 25; // Fixed 25x25mm antenna
  * Units and descriptions are UI-only metadata; values/ranges come from EP_Config.json.
  */
 const FALLBACK_VARS = {
-  probex: { value: 2.1,   unit: 'mm',  min: 2.0,   max: 4.5,   description: 'Feed probe position' },
-  purple: { value: 1.2,   unit: 'mm',  min: 0.5,   max: 2.5,   description: 'Impedance matching strip' },
+  probex: { value: 2.1,   unit: 'mm',  min: 1.5,   max: 4.5,   description: 'Feed probe position' },
+  purple: { value: 1.2,   unit: 'mm',  min: 0.5,   max: 3.0,   description: 'Impedance matching strip' },
   ngreen: { value: 0.2,   unit: 'mm',  min: 0.1,   max: 0.4,   description: 'Half-sphere cut size' },
   orange: { value: 30,    unit: 'deg', min: 10,    max: 90,    description: 'L3 arm angle (CP loop)' },
   orange2:{ value: 55,    unit: 'deg', min: 10,    max: 90,    description: 'L4 arm angle (CP loop)' },

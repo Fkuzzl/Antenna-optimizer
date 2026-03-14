@@ -184,10 +184,6 @@ const HomePage = () => {
   }, [tuningProjectPath, modalAlert]);
 
   // Navigation functions
-  const navigateToPage = (page) => {
-    setCurrentPage(page);
-  };
-
   const navigateHome = () => {
     setCurrentPage('home');
   };
@@ -379,7 +375,7 @@ const HomePage = () => {
           <View style={styles.secondaryGrid}>
             <TouchableOpacity 
               style={styles.secondaryCard}
-              onPress={() => navigateToPage('settings')}
+              onPress={() => setCurrentPage('settings')}
               activeOpacity={0.8}
             >
               <LinearGradient
@@ -401,7 +397,7 @@ const HomePage = () => {
             
             <TouchableOpacity 
               style={styles.secondaryCard}
-              onPress={() => navigateToPage('about')}
+              onPress={() => setCurrentPage('about')}
               activeOpacity={0.8}
             >
               <LinearGradient

@@ -86,7 +86,16 @@ const getMarkerPosition = (value, range) => {
 
 const formatMetricValue = (value, conf) => {
   if (value == null) return '\u2014';
-  const formatted = typeof value === 'number' ? value.toFixed(3) : String(value);
+  let formatted;
+  if (typeof value === 'number') {
+    formatted = value.toFixed(3);
+  } else if (typeof value === 'object' && !Array.isArray(value)) {
+    // Phase 3 AR object with frequency keys (e.g. { x1_575: 1.2, ... }) — show target freq
+    const targetVal = value.x1_575 ?? value.x1_570 ?? value.x1_580 ?? Object.values(value).find(v => typeof v === 'number');
+    formatted = typeof targetVal === 'number' ? targetVal.toFixed(3) : '\u2014';
+  } else {
+    formatted = String(value);
+  }
   return conf?.unit ? `${formatted} ${conf.unit}` : formatted;
 };
 
@@ -167,6 +176,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
   const [adjustValues, setAdjustValues] = useState({});
   const [isRetrying, setIsRetrying] = useState(false);
   const pollRef = useRef(null);
+  const autoNavTimerRef = useRef(null); // tracks the auto-navigate timer for cleanup
 
   const SERVER_URL = AppConfig.serverUrl;
 
@@ -192,8 +202,10 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
             pollRef.current = null;
           }
           // Auto-navigate to results after letting user see the final state
-          if (data.data.status === 'completed' || data.data.status === 'error') {
-            setTimeout(() => {
+          // 'cancelled' and 'stopped' also navigate to results to show partial data
+          if (data.data.status === 'completed' || data.data.status === 'error' ||
+              data.data.status === 'cancelled' || data.data.status === 'stopped') {
+            autoNavTimerRef.current = setTimeout(() => {
               if (onComplete) onComplete(data.data);
             }, 5000);
           }
@@ -216,6 +228,9 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
+      }
+      if (autoNavTimerRef.current) {
+        clearTimeout(autoNavTimerRef.current);
       }
     };
   }, []);

@@ -63,6 +63,8 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const [wsReconnectCount, setWsReconnectCount] = useState(0);
+  // Use a ref so onclose/catch closures always read the current count (avoids stale state)
+  const wsReconnectCountRef = useRef(0);
 
   // Simplified logging state for WebSocket-based updates
   const [lastLoggedData, setLastLoggedData] = useState({
@@ -132,6 +134,7 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
         setWsStatus('Connected');
         setServerStatus('Connected');
         setWsReconnectCount(0);
+        wsReconnectCountRef.current = 0;
         
         // Fetch current execution state immediately on connection
         fetchCurrentExecutionState();
@@ -191,11 +194,12 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
         setServerStatus('Disconnected');
         
         // Auto-reconnect with exponential backoff
-        if (wsReconnectCount < 10) { // Limit reconnect attempts
-          const delay = Math.min(1000 * Math.pow(2, wsReconnectCount), 30000); // Max 30 seconds
-          setWsReconnectCount(prev => prev + 1);
+        if (wsReconnectCountRef.current < 10) { // Limit reconnect attempts
+          const delay = Math.min(1000 * Math.pow(2, wsReconnectCountRef.current), 30000); // Max 30 seconds
+          wsReconnectCountRef.current += 1;
+          setWsReconnectCount(wsReconnectCountRef.current);
           
-          console.log(`🔄 WebSocket reconnecting in ${delay}ms (attempt ${wsReconnectCount + 1})`);
+          console.log(`🔄 WebSocket reconnecting in ${delay}ms (attempt ${wsReconnectCountRef.current})`);
           setWsStatus('Connecting...');
           setServerStatus('Connecting...');
           
@@ -221,11 +225,12 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
       setWsConnected(false);
       
       // Trigger auto-reconnect on connection failure
-      if (wsReconnectCount < 10) {
-        const delay = Math.min(2000 * Math.pow(1.5, wsReconnectCount), 30000);
-        setWsReconnectCount(prev => prev + 1);
+      if (wsReconnectCountRef.current < 10) {
+        const delay = Math.min(2000 * Math.pow(1.5, wsReconnectCountRef.current), 30000);
+        wsReconnectCountRef.current += 1;
+        setWsReconnectCount(wsReconnectCountRef.current);
         
-        console.log(`🔄 Retrying connection in ${delay}ms (attempt ${wsReconnectCount + 1}/10)`);
+        console.log(`🔄 Retrying connection in ${delay}ms (attempt ${wsReconnectCountRef.current}/10)`);
         
         reconnectTimeoutRef.current = setTimeout(() => {
           connectWebSocket();
