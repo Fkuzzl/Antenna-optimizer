@@ -12,7 +12,11 @@
     "server": "node server/start-server.js",
     "server-direct": "node server/matlab-server.js",
     "kill-server": "taskkill /F /IM node.exe 2>nul || echo No Node.js processes found",
-    "check-connections": "netstat -an | findstr :3001"
+    "check-connections": "netstat -an | findstr :3001",
+    "desktop:dev": "concurrently -k -n SERVER,WEB,ELECTRON -c green,blue,magenta \"npm run server\" \"npm run web -- --port 8081 --host localhost\" \"wait-on tcp:3001 http://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 electron electron/main.js\"",
+    "desktop:web:build": "expo export --platform web --output-dir dist-web",
+    "desktop:pack:win": "npm run desktop:web:build && electron-builder --win nsis",
+    "desktop:pack:dir": "npm run desktop:web:build && electron-builder --win dir"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -43,6 +47,39 @@
   },
   "private": true,
   "devDependencies": {
-    "expo-module-scripts": "^5.0.8"
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12",
+    "expo-module-scripts": "^5.0.8",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.fyp.antennaoptimizer",
+    "productName": "Antenna Optimizer",
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      "dist-web/**/*",
+      "server/**/*",
+      "scripts/**/*",
+      "config/**/*",
+      "Function/**/*",
+      "OPEN_THIS/SETUP/setup_loader.js",
+      "OPEN_THIS/SETUP/setup_variable.json",
+      "package.json"
+    ],
+    "directories": {
+      "output": "electron-dist"
+    },
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Antenna-Optimizer-${version}-Setup.${ext}"
+    }
   }
 }

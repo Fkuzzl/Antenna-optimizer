@@ -141,5 +141,11 @@ pip install -r OPEN_THIS/SETUP/requirements.txt
 - **Data Processing**: Python 3.8+ (pandas, openpyxl, ezdxf, shapely)
 - **Optimization**: MATLAB R2020b+ + HFSS 2022 R2
 
+## Electron (Desktop Packaging)
+
+- Main branch remains Expo-first.
+- Electron implementation is prepared on branch: `feature/electron-windows`.
+- See [ELECTRON_WINDOWS_SETUP.md](ELECTRON_WINDOWS_SETUP.md) for development and Windows packaging steps.
+
 ## Author
 Mario Ma (https://github.com/Fkuzzl)

@@ -10,6 +10,7 @@ OPEN_THIS/SETUP/setup_variable.json
 .expo/
 dist/
 web-build/
+dist-web/
 expo-env.d.ts
 
 # Native
@@ -67,6 +68,7 @@ Function/HFSS/F_GND_Import.m
 npm-debug.log*
 yarn-debug.log*
 server/server.pid
+electron-dist/
 
 # IDE
 .vscode/
