@@ -8,6 +8,8 @@ const path = require('path');
 const { TIMEOUTS, RETRY, EXCEL_SHEETS, FILES } = require('../config/constants');
 const logger = require('../config/logger');
 
+const BALANCED_OPTIMAL_MAX_AR_DB = 1;
+
 /**
  * Reads Excel file with retry logic for handling file corruption or locks
  * @param {string} filePath - Path to Excel file
@@ -89,6 +91,128 @@ const readSimulationResults = (excelPath) => {
 };
 
 /**
+ * Select a representative objective value from one iteration.
+ * Prefer the value at/nearest target frequency when available; otherwise fallback to best-in-array.
+ */
+const getObjectiveValue = (iteration, metricKey, targetFrequency, objective) => {
+    const values = Array.isArray(iteration?.[metricKey]) ? iteration[metricKey] : [];
+    const frequencies = Array.isArray(iteration?.frequencies) ? iteration.frequencies : [];
+
+    if (values.length === 0) return null;
+
+    if (frequencies.length > 0 && values.length === frequencies.length) {
+        let bestIndex = 0;
+        let bestDelta = Math.abs(frequencies[0] - targetFrequency);
+        for (let index = 1; index < frequencies.length; index++) {
+            const delta = Math.abs(frequencies[index] - targetFrequency);
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                bestIndex = index;
+            }
+        }
+        const atTarget = values[bestIndex];
+        if (typeof atTarget === 'number' && !isNaN(atTarget)) {
+            return atTarget;
+        }
+    }
+
+    const numericValues = values.filter((value) => typeof value === 'number' && !isNaN(value));
+    if (numericValues.length === 0) return null;
+    return objective === 'max' ? Math.max(...numericValues) : Math.min(...numericValues);
+};
+
+/**
+ * Compute balanced optimum for objectives:
+ *   min(s11), min(ar), max(gain)
+ * Uses normalized scores per objective and equal weighting.
+ */
+const computeBalancedOptimal = (allIterations, targetFrequency = 1.575) => {
+    const candidates = allIterations
+        .map((iteration) => {
+            const s11 = getObjectiveValue(iteration, 's11', targetFrequency, 'min');
+            const ar = getObjectiveValue(iteration, 'ar', targetFrequency, 'min');
+            const gain = getObjectiveValue(iteration, 'gain', targetFrequency, 'max');
+
+            if (s11 == null || ar == null || gain == null) {
+                return null;
+            }
+
+            if (ar >= BALANCED_OPTIMAL_MAX_AR_DB) {
+                return null;
+            }
+
+            return {
+                iteration: iteration.iteration,
+                s11,
+                ar,
+                gain,
+            };
+        })
+        .filter(Boolean);
+
+    if (candidates.length === 0) {
+        return null;
+    }
+
+    const s11Values = candidates.map((candidate) => candidate.s11);
+    const arValues = candidates.map((candidate) => candidate.ar);
+    const gainValues = candidates.map((candidate) => candidate.gain);
+
+    const s11Min = Math.min(...s11Values);
+    const s11Max = Math.max(...s11Values);
+    const arMin = Math.min(...arValues);
+    const arMax = Math.max(...arValues);
+    const gainMin = Math.min(...gainValues);
+    const gainMax = Math.max(...gainValues);
+
+    const normalizeMin = (value, min, max) => (max === min ? 1 : (max - value) / (max - min));
+    const normalizeMax = (value, min, max) => (max === min ? 1 : (value - min) / (max - min));
+
+    let bestCandidate = null;
+    for (const candidate of candidates) {
+        const scoreS11 = normalizeMin(candidate.s11, s11Min, s11Max);
+        const scoreAr = normalizeMin(candidate.ar, arMin, arMax);
+        const scoreGain = normalizeMax(candidate.gain, gainMin, gainMax);
+        const balancedScore = (scoreS11 + scoreAr + scoreGain) / 3;
+
+        const scoredCandidate = {
+            ...candidate,
+            score: {
+                s11: scoreS11,
+                ar: scoreAr,
+                gain: scoreGain,
+                balanced: balancedScore,
+            },
+        };
+
+        if (!bestCandidate || scoredCandidate.score.balanced > bestCandidate.score.balanced) {
+            bestCandidate = scoredCandidate;
+        }
+    }
+
+    return {
+        iteration: bestCandidate.iteration,
+        targetFrequency,
+        objectives: {
+            s11: bestCandidate.s11,
+            ar: bestCandidate.ar,
+            gain: bestCandidate.gain,
+        },
+        normalizedScore: {
+            s11: bestCandidate.score.s11,
+            ar: bestCandidate.score.ar,
+            gain: bestCandidate.score.gain,
+            balanced: bestCandidate.score.balanced,
+        },
+        objectiveDirection: {
+            s11: 'min',
+            ar: 'min',
+            gain: 'max',
+        },
+    };
+};
+
+/**
  * Gets paginated simulation results
  * @param {string} excelPath - Path to Excel file
  * @param {number} page - Page number (1-indexed)
@@ -119,7 +243,8 @@ const getPaginatedResults = (excelPath, page = 1, pageSize = 100) => {
         totalIterations,
         s11Available: allIterations.some(iter => iter.s11 && iter.s11.length > 0),
         arAvailable: allIterations.some(iter => iter.ar && iter.ar.length > 0),
-        gainAvailable: allIterations.some(iter => iter.gain && iter.gain.length > 0)
+        gainAvailable: allIterations.some(iter => iter.gain && iter.gain.length > 0),
+        balancedOptimal: computeBalancedOptimal(allIterations)
     };
 
     return {

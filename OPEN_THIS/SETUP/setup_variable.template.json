@@ -23,6 +23,7 @@
     "port": 8081
   },
   "hfss": {
+    "exe_path": "AUTO_DETECTED",
     "process_names": [
       "ansysedt.exe",
       "anshfss.exe",

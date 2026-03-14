@@ -10,9 +10,36 @@ const { spawn, exec } = require('child_process');
 const processManager = require('../services/processManager');
 const progressiveTuningManager = require('../services/progressiveTuningManager');
 const websocketManager = require('../services/websocketManager');
+const { syncHfssPathForProject } = require('../services/hfssPathSync');
 const { createResponse } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
 const logger = require('../config/logger');
+
+const setupConfigPath = path.join(__dirname, '..', '..', 'OPEN_THIS', 'SETUP', 'setup_loader');
+
+function loadSetupConfig() {
+    try {
+        return require(setupConfigPath);
+    } catch (error) {
+        logger.warn('Setup config not found, using runtime defaults', { error: error.message });
+        return null;
+    }
+}
+
+function getConfiguredMatlabExecutable() {
+    const setupConfig = loadSetupConfig();
+    if (!setupConfig) return 'matlab';
+
+    try {
+        const matlabPaths = setupConfig.getMatlabPaths?.() || [];
+        if (Array.isArray(matlabPaths) && matlabPaths.length > 0 && matlabPaths[0]) {
+            return matlabPaths[0];
+        }
+    } catch {
+        // fallback below
+    }
+    return 'matlab';
+}
 
 /**
  * Helper: Get MATLAB processes
@@ -230,8 +257,8 @@ router.post('/run', async (req, res) => {
             );
         }
 
-        // Resolve script file: if directory, scan for .mlx or .m
-        // Priority: Main_*.mlx > any *.mlx > Main_*.m > any *.m
+        // Resolve script file: if directory, scan for .m or .mlx
+        // Priority: Main_*.m > any *.m > Main_*.mlx > any *.mlx
         let scriptFile;
         const inputStat = fs.statSync(inputPath);
         if (inputStat.isDirectory()) {
@@ -239,9 +266,9 @@ router.post('/run', async (req, res) => {
             const mlxFiles = entries.filter(f => f.toLowerCase().endsWith('.mlx'));
             const mFiles   = entries.filter(f => f.toLowerCase().endsWith('.m') && !f.startsWith('.'));
 
-            const mainMlx = mlxFiles.find(f => f.toLowerCase().startsWith('main_'));
             const mainM   = mFiles.find(f => f.toLowerCase().startsWith('main_'));
-            const found   = mainMlx || mlxFiles[0] || mainM || mFiles[0];
+            const mainMlx = mlxFiles.find(f => f.toLowerCase().startsWith('main_'));
+            const found   = mainM || mFiles[0] || mainMlx || mlxFiles[0];
 
             if (!found) {
                 return res.status(HTTP_STATUS.NOT_FOUND).json(
@@ -269,7 +296,7 @@ router.post('/run', async (req, res) => {
 
         // Start MATLAB process
         const processResult = await processManager.startMatlabProcess({
-            command: 'matlab',
+            command: getConfiguredMatlabExecutable(),
             args: ['-r', matlabCommand],
             cwd: fileDir,
             metadata: {
@@ -473,7 +500,8 @@ router.post('/stop', async (req, res) => {
  * Check if MATLAB is installed and accessible
  */
 router.get('/check', (req, res) => {
-    exec('matlab -batch "disp(\'MATLAB available\')"', { timeout: 5000 }, (error, stdout, stderr) => {
+    const matlabExecutable = getConfiguredMatlabExecutable();
+    exec(`"${matlabExecutable}" -batch "disp('MATLAB available')"`, { timeout: 5000 }, (error, stdout, stderr) => {
         if (error) {
             return res.json(createResponse(false, null, 'MATLAB not found or not accessible'));
         }
@@ -488,7 +516,8 @@ router.get('/check', (req, res) => {
 router.post('/check-file', (req, res) => {
     try {
         const { projectPath, filePath: legacyFilePath } = req.body;
-        const inputPath = projectPath || legacyFilePath;
+        const inputPathRaw = projectPath || legacyFilePath;
+        const inputPath = String(inputPathRaw || '').trim().replace(/^"+|"+$/g, '');
 
         if (!inputPath) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -526,6 +555,11 @@ router.post('/check-file', (req, res) => {
             }
         }
 
+        const projectDir = (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory())
+            ? inputPath
+            : path.dirname(inputPath);
+        const hfssPathSync = syncHfssPathForProject(projectDir);
+
         const mExists   = mFilePath   ? fs.existsSync(mFilePath)   : false;
         const mlxExists = mlxFilePath ? fs.existsSync(mlxFilePath) : false;
         const exists = mExists || mlxExists;
@@ -533,7 +567,12 @@ router.post('/check-file', (req, res) => {
         const fileInfo = {
             exists: exists,
             mFile: mExists,
-            mlxFile: mlxExists
+            mlxFile: mlxExists,
+            hfssPathSync: {
+                updated: !!hfssPathSync.updated,
+                reason: hfssPathSync.reason,
+                epConfigPath: hfssPathSync.epConfigPath || null,
+            }
         };
         
         if (exists) {

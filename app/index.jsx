@@ -262,7 +262,7 @@ const HomePage = () => {
             resizeMode="contain"
           />
           <Text style={styles.appTitle}>Antenna Optimizer</Text>
-          <Text style={styles.appSubtitle}>Control MATLAB simulations • Monitor HFSS processes • View results in real-time</Text>
+          <Text style={styles.appSubtitle}>Control MATLAB simulations | Monitor HFSS processes | View results in real-time</Text>
         </View>
       </LinearGradient>
 
@@ -304,14 +304,14 @@ const HomePage = () => {
                     <Text style={styles.primaryCardSubtitle}>Execute MATLAB Live Scripts and monitor HFSS simulations</Text>
                   </View>
                   <View style={styles.primaryCardArrow}>
-                    <Text style={styles.primaryCardArrowText}>→</Text>
+                    <Text style={styles.primaryCardArrowText}>{'>'}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.primaryCardFeatures}>
-                  <Text style={styles.primaryCardFeature}>✨ Visual MATLAB UI</Text>
-                  <Text style={styles.primaryCardFeature}>📈 Track Iterations</Text>
-                  <Text style={styles.primaryCardFeature}>🎛️ Start/Stop Control</Text>
+                  <Text style={styles.primaryCardFeature}>Visual MATLAB UI</Text>
+                  <Text style={styles.primaryCardFeature}>Track Iterations</Text>
+                  <Text style={styles.primaryCardFeature}>Start/Stop Control</Text>
                 </View>
                 {checkingMatlabStatus && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
@@ -348,14 +348,14 @@ const HomePage = () => {
                     <Text style={styles.primaryCardSubtitle}>Pre-optimize antenna parameters before MOEA/D</Text>
                   </View>
                   <View style={styles.primaryCardArrow}>
-                    <Text style={styles.primaryCardArrowText}>→</Text>
+                    <Text style={styles.primaryCardArrowText}>{'>'}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.primaryCardFeatures}>
-                  <Text style={styles.primaryCardFeature}>🎯 3-Phase Tuning</Text>
-                  <Text style={styles.primaryCardFeature}>⚡ 3-7x Speedup</Text>
-                  <Text style={styles.primaryCardFeature}>📐 Range Tightening</Text>
+                  <Text style={styles.primaryCardFeature}>3-Phase Tuning</Text>
+                  <Text style={styles.primaryCardFeature}>3-7x Speedup</Text>
+                  <Text style={styles.primaryCardFeature}>Range Tightening</Text>
                 </View>
                 {checkingTuningStatus && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>

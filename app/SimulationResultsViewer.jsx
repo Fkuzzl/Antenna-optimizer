@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Image } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import AppConfig, { PathUtils, showAlert } from './app_config';
 
@@ -81,7 +81,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         return;
       }
 
-      console.log('🔄 Updating results from simulation data...');
+      console.log('Updating results from simulation data...');
       
       // Server will check if Excel exists:
       // - If not: creates Excel with all CSV data
@@ -95,14 +95,14 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       const result = await response.json();
       
       if (!result.success) {
-        console.error('❌ Failed to update results:', result.message);
+        console.error('Failed to update results:', result.message);
         showAlert('Error', 'Could not load simulation results. Please ensure optimization has been run and data files exist.');
         setIsLoading(false);
         return;
       }
 
       const action = result.data?.action || 'updated';
-      console.log(`✅ Excel file ${action} successfully`);
+      console.log(`Excel file ${action} successfully`);
       
       // Wait a moment for file to be fully written and closed
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -111,7 +111,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       await loadPage('last');
       
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('Error:', error);
       showAlert('Error', 'Could not connect to server. Please check if the server is running.');
       setIsLoading(false);
     }
@@ -135,7 +135,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       // If 'last' is specified, we need to get total pages first
       let targetPage = page === 'last' ? 1 : page;
       
-      console.log(`📖 Loading page ${page === 'last' ? 'latest' : page}...`);
+      console.log(`Loading page ${page === 'last' ? 'latest' : page}...`);
 
       const response = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/read-page`, {
         method: 'POST',
@@ -148,7 +148,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
         const errorResult = await response.json().catch(() => ({}));
         
         if (response.status === 404 || errorResult.message?.includes('not found')) {
-          showAlert('Excel File Not Found', 'The Excel file was not found or has been deleted. Please click "🔄 Update Results" to regenerate it from simulation data.');
+          showAlert('Excel File Not Found', 'The Excel file was not found or has been deleted. Please click "Update Results from CSV" to regenerate it from simulation data.');
         } else if (response.status === 503) {
           showAlert('File Locked', 'Excel file is being updated. Please wait a moment and try again.');
         } else {
@@ -180,7 +180,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       } else {
         // Excel file not found - inform user to click "Update Results"
         if (result.message?.includes('not found') || result.message?.includes('Excel file')) {
-          showAlert('Excel File Not Found', 'The Excel file was not found. Please click "🔄 Update Results" to generate it from simulation data.');
+          showAlert('Excel File Not Found', 'The Excel file was not found. Please click "Update Results from CSV" to generate it from simulation data.');
         } else {
           showAlert('Error', result.message || 'Could not load results.');
         }
@@ -249,9 +249,13 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               colors={['#10b981', '#059669']}
               style={styles.modalGradient}
             >
-              <View style={styles.iconCircle}>
-                <Text style={styles.iconText}>🔄</Text>
-              </View>
+                  <View style={styles.iconCircle}>
+                    <Image
+                      source={require('../assets/Matlab_Logo.png')}
+                      style={styles.iconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
               <Text style={styles.modalTitle}>MATLAB Antenna Optimizer</Text>
               <Text style={styles.modalSubtitle}>Data might be outdated...</Text>
               
@@ -267,7 +271,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
                 disabled={isLoading}
               >
                 <Text style={styles.refreshButtonText}>
-                  {isLoading ? '⏳ Refreshing...' : '🔄 Refresh Latest Results'}
+                  {isLoading ? 'Refreshing...' : 'Refresh Latest Results'}
                 </Text>
               </TouchableOpacity>
 
@@ -285,7 +289,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
       <View style={styles.fixedHeader}>
         <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Simulation Results</Text>
           <View style={{ width: 60 }} />
@@ -294,42 +298,66 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
 
       <ScrollView style={styles.content}>
         <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>📊 Simulation Results (Paginated)</Text>
+          <Text style={styles.infoTitle}>Simulation Results (Paginated)</Text>
           <Text style={styles.infoText}>
             Results loaded in pages of 100 iterations. Page 1 = oldest (iter 1-100), last page = newest iterations. Loads latest by default.
           </Text>
           <Text style={styles.pathInfo}>
-            📁 Project: {projectPath ? projectPath.split('\\').pop() : 'Not specified'}
+            Project: {projectPath ? projectPath.split('\\').pop() : 'Not specified'}
           </Text>
           {simulationResults.iterations.length > 0 && (
             <View style={styles.iterationStatus}>
               <Text style={styles.iterationStatusText}>
-                Page {currentPage || 1} of {totalPages || 1} • Total: {simulationResults.summary.totalIterations || 0} iterations
+                Page {currentPage || 1} of {totalPages || 1} | Total: {simulationResults.summary.totalIterations || 0} iterations
               </Text>
               {elapsedMinutes > 0 && (
                 <Text style={styles.timerText}>
-                  ⏱️ Loaded {elapsedMinutes} min ago {elapsedMinutes >= 4 && '(refresh recommended)'}
+                  Loaded {elapsedMinutes} min ago {elapsedMinutes >= 4 && '(refresh recommended)'}
                 </Text>
               )}
             </View>
           )}
         </View>
 
-        {/* Update Results Button - Always Visible */}
+        {simulationResults.summary?.balancedOptimal && (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoTitle}>Balanced Optimal Result</Text>
+            <Text style={styles.infoText}>
+              Objective: min(S11), min(AR), max(Gain) with AR &lt; 1 dB @ {simulationResults.summary.balancedOptimal.targetFrequency} GHz
+            </Text>
+            <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>Best Iteration:</Text>
+              <Text style={styles.parameterValue}>#{simulationResults.summary.balancedOptimal.iteration}</Text>
+            </View>
+            <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>S11:</Text>
+              <Text style={styles.parameterValue}>{formatResult(simulationResults.summary.balancedOptimal.objectives.s11)} dB</Text>
+            </View>
+            <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>AR:</Text>
+              <Text style={styles.parameterValue}>{formatResult(simulationResults.summary.balancedOptimal.objectives.ar)}</Text>
+            </View>
+            <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>Gain:</Text>
+              <Text style={styles.parameterValue}>{formatResult(simulationResults.summary.balancedOptimal.objectives.gain)} dBi</Text>
+            </View>
+            <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>Balanced Score:</Text>
+              <Text style={[styles.parameterValue, { color: '#059669' }]}> 
+                {simulationResults.summary.balancedOptimal.normalizedScore.balanced.toFixed(4)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Primary Results Button */}
         <TouchableOpacity onPress={refreshLatestResults} style={styles.refreshLatestButton} disabled={isLoading}>
           <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']} style={styles.refreshLatestGradient}>
-            <Text style={styles.refreshLatestText}>{isLoading ? '⏳ Updating...' : '🔄 Update Results from CSV'}</Text>
+            <Text style={styles.refreshLatestText}>
+              {isLoading ? 'Updating...' : (simulationResults.iterations.length === 0 ? 'Load Latest Results' : 'Update Results from CSV')}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
-
-        {/* Load Button */}
-        {simulationResults.iterations.length === 0 && (
-          <TouchableOpacity onPress={() => loadPage('last')} style={styles.actionButton} disabled={isLoading}>
-            <LinearGradient colors={isLoading ? ['#94a3b8', '#64748b'] : ['#3b82f6', '#1d4ed8']} style={styles.actionButtonGradient}>
-              <Text style={styles.actionButtonText}>{isLoading ? '⏳ Loading...' : '📥 Load from Excel File'}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
 
         {/* Pagination Controls */}
         {simulationResults.iterations.length > 0 && (
@@ -344,7 +372,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               disabled={currentPage <= 1 || isLoading}
               activeOpacity={currentPage <= 1 || isLoading ? 1 : 0.7}
             >
-              <Text style={[styles.pageButtonText, (currentPage <= 1 || isLoading) && styles.pageButtonTextDisabled]}>← Previous</Text>
+              <Text style={[styles.pageButtonText, (currentPage <= 1 || isLoading) && styles.pageButtonTextDisabled]}>Previous</Text>
             </TouchableOpacity>
             
             <Text style={styles.pageInfo}>Page {currentPage || 1} / {totalPages || 1}</Text>
@@ -359,7 +387,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               disabled={currentPage >= totalPages || !hasMore || isLoading}
               activeOpacity={currentPage >= totalPages || !hasMore || isLoading ? 1 : 0.7}
             >
-              <Text style={[styles.pageButtonText, (currentPage >= totalPages || !hasMore || isLoading) && styles.pageButtonTextDisabled]}>Next →</Text>
+              <Text style={[styles.pageButtonText, (currentPage >= totalPages || !hasMore || isLoading) && styles.pageButtonTextDisabled]}>Next</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -369,12 +397,12 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
           <View style={styles.resultsSection}>
             <View style={styles.resultsSummaryHeader}>
               <Text style={styles.resultsSectionTitle}>
-                📈 Showing {simulationResults.iterations.length} iterations
+                Showing {simulationResults.iterations.length} iterations
               </Text>
               <Text style={styles.summaryInfoText}>
-                {simulationResults.summary.s11Available ? '✅ S11' : '❌ S11'} • 
-                {simulationResults.summary.arAvailable ? '✅ AR' : '❌ AR'} • 
-                {simulationResults.summary.gainAvailable ? '✅ Gain' : '❌ Gain'}
+                {simulationResults.summary.s11Available ? 'S11 ready' : 'S11 missing'} | 
+                {simulationResults.summary.arAvailable ? 'AR ready' : 'AR missing'} | 
+                {simulationResults.summary.gainAvailable ? 'Gain ready' : 'Gain missing'}
               </Text>
             </View>
 
@@ -391,8 +419,8 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
           </View>
         ) : !isLoading && (
           <View style={styles.noDataSection}>
-            <Text style={styles.noDataTitle}>📄 No Results Loaded</Text>
-            <Text style={styles.noDataText}>Click "Load Results" to fetch data from the Excel file.</Text>
+            <Text style={styles.noDataTitle}>No Results Loaded</Text>
+            <Text style={styles.noDataText}>Use "Load Latest Results" to generate or refresh data from simulation CSV files.</Text>
           </View>
         )}
       </ScrollView>
@@ -448,7 +476,7 @@ const styles = StyleSheet.create({
   modalContent: { width: '85%', maxWidth: 400, borderRadius: 16, overflow: 'hidden', elevation: 10 },
   modalGradient: { padding: 30, alignItems: 'center' },
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 255, 255, 0.3)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  iconText: { fontSize: 40 },
+  iconImage: { width: 46, height: 46 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', marginBottom: 8, textAlign: 'center' },
   modalSubtitle: { fontSize: 15, color: 'rgba(255, 255, 255, 0.9)', marginBottom: 20, textAlign: 'center' },
   loadingDots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 30 },

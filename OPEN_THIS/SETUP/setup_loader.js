@@ -113,6 +113,19 @@ class SetupConfigLoader {
     }
 
     /**
+     * Get HFSS executable path (ansysedt.exe)
+     * @returns {string|null}
+     */
+    getHfssExecutablePath() {
+        const config = this.load();
+        const exePath = config?.hfss?.exe_path;
+        if (exePath && typeof exePath === 'string' && exePath.trim()) {
+            return exePath.trim();
+        }
+        return null;
+    }
+
+    /**
      * Get network configuration
      * @returns {Object} Network configuration
      */

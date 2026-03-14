@@ -149,7 +149,7 @@ export default function ProgressiveTuningResults({
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.backLink} onPress={onBack}>
-          <Text style={styles.backLinkText}>← Go Back</Text>
+          <Text style={styles.backLinkText}>{'< Go Back'}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -181,7 +181,7 @@ export default function ProgressiveTuningResults({
       >
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>{'< Back'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Tuning Results</Text>
           <View style={{ width: 60 }} />
@@ -198,7 +198,7 @@ export default function ProgressiveTuningResults({
               {isComplete ? 'PROGRESSIVE TUNING COMPLETE' : 'PARTIAL CONVERGENCE'}
             </Text>
             <Text style={styles.statusBannerDetail}>
-              Total simulations: {totalSims}  •  Time: {formatElapsed(totalTime)}
+              Total simulations: {totalSims}  |  Time: {formatElapsed(totalTime)}
             </Text>
           </View>
         </View>
@@ -460,7 +460,7 @@ export default function ProgressiveTuningResults({
                   {isStartingMoead ? 'Generating F_Model_Element.m' : '~50-100 sims, ~4-8 hours'}
                 </Text>
               </View>
-              {!isStartingMoead && <Text style={styles.actionCardArrow}>→</Text>}
+              {!isStartingMoead && <Text style={styles.actionCardArrow}>{'>'}</Text>}
             </LinearGradient>
           </TouchableOpacity>
 
@@ -483,7 +483,7 @@ export default function ProgressiveTuningResults({
                 <Text style={styles.actionCardTitle}>Re-run Progressive Tuning</Text>
                 <Text style={styles.actionCardSubtitle}>With different settings</Text>
               </View>
-              <Text style={styles.actionCardArrow}>→</Text>
+              <Text style={styles.actionCardArrow}>{'>'}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -512,7 +512,7 @@ export default function ProgressiveTuningResults({
                 <Text style={styles.actionCardTitle}>View File Locations</Text>
                 <Text style={styles.actionCardSubtitle}>See where .mat/.csv results are saved</Text>
               </View>
-              <Text style={styles.actionCardArrow}>→</Text>
+              <Text style={styles.actionCardArrow}>{'>'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -560,7 +560,7 @@ function ChartCard({ url, label }) {
         />
         {loaded && !imgError && (
           <View style={styles.zoomHint}>
-            <Text style={styles.zoomHintText}>🔍 Tap to zoom</Text>
+            <Text style={styles.zoomHintText}>Tap to zoom</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -588,10 +588,10 @@ function ChartCard({ url, label }) {
             />
           </ScrollView>
           <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setModalVisible(false)}>
-            <Text style={styles.modalCloseBtnText}>✕</Text>
+            <Text style={styles.modalCloseBtnText}>X</Text>
           </TouchableOpacity>
           <View style={styles.modalHintRow}>
-            <Text style={styles.modalHintText}>Pinch to zoom  •  Tap ✕ to close</Text>
+            <Text style={styles.modalHintText}>Pinch to zoom | Tap X to close</Text>
           </View>
         </View>
       </Modal>

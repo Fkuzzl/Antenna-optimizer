@@ -55,7 +55,7 @@ const SettingsPage = ({ onBack }) => {
       >
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>{'<'} Back</Text>
           </TouchableOpacity>
         </View>
         
@@ -85,7 +85,7 @@ const SettingsPage = ({ onBack }) => {
 
         {/* Server Configuration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🖥️ Server Configuration</Text>
+          <Text style={styles.sectionTitle}>Server Configuration</Text>
           
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -122,7 +122,7 @@ const SettingsPage = ({ onBack }) => {
 
         {/* System Paths Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📂 System Paths</Text>
+          <Text style={styles.sectionTitle}>System Paths</Text>
           
           <View style={styles.infoCard}>
             <Text style={styles.infoIcon}>ℹ️</Text>
@@ -132,9 +132,9 @@ const SettingsPage = ({ onBack }) => {
                 System paths are configured in:{'\n'}
                 OPEN_THIS/SETUP/setup_variable.json{'\n\n'}
                 Contains:{' \n'}
-                • MATLAB installation path (where MATLAB.exe is located){'\n'}
-                • Python executable path (for processing scripts){'\n'}
-                • Project directories (where optimization files are stored){'\n\n'}
+                - MATLAB installation path (where MATLAB.exe is located){'\n'}
+                - Python executable path (for processing scripts){'\n'}
+                - Project directories (where optimization files are stored){'\n\n'}
                 To update: Run OPEN_THIS/run_setup.bat
               </Text>
             </View>
@@ -143,7 +143,7 @@ const SettingsPage = ({ onBack }) => {
 
         {/* Feature Configuration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚙️ Feature Settings</Text>
+          <Text style={styles.sectionTitle}>Feature Settings</Text>
           
           <View style={styles.featureCard}>
             <Text style={styles.featureIcon}>🎯</Text>

@@ -67,10 +67,19 @@ class QuickSetup {
             console.log(`⚠️  Python: Not found (will need manual input)`);
         }
 
+        // Detect HFSS (ANSYS Electronics Desktop)
+        this.detectedConfig.hfssExe = this.detectHFSS();
+        if (this.detectedConfig.hfssExe) {
+            console.log(`✅ HFSS: ${this.detectedConfig.hfssExe}`);
+        } else {
+            console.log(`⚠️  HFSS: Not found (will use fallback process detection only)`);
+        }
+
         // Check port availability
         const portAvailable = this.checkPort(3001);
         console.log(`${portAvailable ? '✅' : '⚠️ '} Port 3001: ${portAvailable ? 'Available' : 'In use (will use 3002)'}`);
         this.detectedConfig.port = portAvailable ? 3001 : 3002;
+
     }
 
     async checkDependencies() {
@@ -356,13 +365,66 @@ class QuickSetup {
         if (confirmPort.toLowerCase() === 'n') {
             this.detectedConfig.port = parseInt(await this.question('Enter port number: '), 10);
         }
+
+        // Confirm HFSS (optional)
+        if (this.detectedConfig.hfssExe) {
+            const confirmHFSS = await this.question(`\nHFSS: ${this.detectedConfig.hfssExe}\nUse this path? [Y/n/Browse]: `);
+            if (confirmHFSS.toLowerCase() === 'n' || confirmHFSS.toLowerCase() === 'browse') {
+                this.detectedConfig.hfssExe = (await this.question('Enter HFSS path (ansysedt.exe), or leave blank: ')).replace(/['"]/g, '').trim();
+            }
+        } else {
+            this.detectedConfig.hfssExe = (await this.question('\nHFSS not found. Enter path to ansysedt.exe (optional, press Enter to skip): ')).replace(/['"]/g, '').trim();
+        }
+
     }
 
     async manualSetup() {
         this.detectedConfig.ip = await this.question('Enter your IP address: ');
         this.detectedConfig.matlab = (await this.question('Enter MATLAB path (matlab.exe): ')).replace(/['"]/g, '');
         this.detectedConfig.python = (await this.question('Enter Python path (python.exe): ')).replace(/['"]/g, '');
+        this.detectedConfig.hfssExe = (await this.question('Enter HFSS path (ansysedt.exe) [optional]: ')).replace(/['"]/g, '').trim();
         this.detectedConfig.port = parseInt(await this.question('Enter server port [3001]: ') || '3001', 10);
+    }
+
+    detectHFSS() {
+        const candidates = [];
+
+        // Common ANSYS EM installation roots
+        const roots = [
+            'C:\\Program Files\\AnsysEM',
+            'C:\\Program Files (x86)\\AnsysEM',
+            'D:\\Program Files\\AnsysEM',
+            'D:\\AnsysEM'
+        ];
+
+        for (const root of roots) {
+            if (!fs.existsSync(root)) continue;
+            try {
+                const versions = fs.readdirSync(root)
+                    .filter(v => /^v\d+/i.test(v))
+                    .sort()
+                    .reverse();
+
+                for (const version of versions) {
+                    candidates.push(path.join(root, version, 'Win64', 'ansysedt.exe'));
+                    candidates.push(path.join(root, version, 'Linux64', 'ansysedt.exe'));
+                }
+            } catch {
+                // ignore traversal errors and continue
+            }
+        }
+
+        // Legacy fallback locations
+        candidates.push('C:\\Program Files\\AnsysEM\\Win64\\ansysedt.exe');
+        candidates.push('D:\\Program Files\\AnsysEM\\Win64\\ansysedt.exe');
+
+        for (const exePath of candidates) {
+            if (fs.existsSync(exePath)) {
+                return exePath;
+            }
+        }
+
+        return '';
     }
 
     async testConfiguration() {
@@ -447,6 +509,7 @@ class QuickSetup {
                 "port": 8081
             },
             "hfss": {
+                "exe_path": this.detectedConfig.hfssExe || '',
                 "process_names": [
                     "ansysedt.exe",
                     "anshfss.exe",

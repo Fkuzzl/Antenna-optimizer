@@ -15,6 +15,19 @@ const { HTTP_STATUS, FILES } = require('../config/constants');
 const logger = require('../config/logger');
 
 /**
+ * Resolve a usable project directory from incoming projectPath.
+ * Supports either a directory path or a specific MATLAB file path.
+ */
+const resolveProjectDir = (projectPath) => {
+    const cleaned = String(projectPath || '').trim().replace(/^"+|"+$/g, '');
+    if (!cleaned) return cleaned;
+    if (fs.existsSync(cleaned) && fs.statSync(cleaned).isFile()) {
+        return path.dirname(cleaned);
+    }
+    return cleaned;
+};
+
+/**
  * Returns the Python executable path from setup config, falling back to 'python'.
  * Mirrors the pattern used in optimization.js, matlab.js, etc.
  */
@@ -33,7 +46,7 @@ const getPythonExecutable = () => {
  */
 router.post('/read-page', validateProjectPath, validatePaginationParams, async (req, res) => {
     try {
-        const projectPath = req.validatedProjectPath;
+        const projectPath = resolveProjectDir(req.validatedProjectPath);
         const { page, pageSize } = req.pagination;
         
         const excelPath = path.join(projectPath, FILES.EXCEL_FILENAME);
@@ -71,7 +84,7 @@ router.post('/read-page', validateProjectPath, validatePaginationParams, async (
  */
 router.post('/update', validateProjectPath, async (req, res) => {
     try {
-        const projectPath = req.validatedProjectPath;
+        const projectPath = resolveProjectDir(req.validatedProjectPath);
         const excelPath = path.join(projectPath, FILES.EXCEL_FILENAME);
         
         logger.info(`Updating Excel for project: ${projectPath}`);
@@ -118,7 +131,7 @@ router.post('/update', validateProjectPath, async (req, res) => {
  */
 router.post('/create', validateProjectPath, async (req, res) => {
     try {
-        const projectPath = req.validatedProjectPath;
+        const projectPath = resolveProjectDir(req.validatedProjectPath);
         
         logger.info(`Creating Excel for project: ${projectPath}`);
 
@@ -150,7 +163,7 @@ router.post('/create', validateProjectPath, async (req, res) => {
  */
 router.post('/clear', validateProjectPath, async (req, res) => {
     try {
-        const projectPath = req.validatedProjectPath;
+        const projectPath = resolveProjectDir(req.validatedProjectPath);
         
         logger.info(`Clearing integrated Excel for project: ${projectPath}`);
 
@@ -196,7 +209,7 @@ router.post('/clear', validateProjectPath, async (req, res) => {
  */
 router.post('/read', validateProjectPath, async (req, res) => {
     try {
-        const projectPath = req.validatedProjectPath;
+        const projectPath = resolveProjectDir(req.validatedProjectPath);
         
         logger.info(`Reading integrated Excel for project: ${projectPath}`);
 

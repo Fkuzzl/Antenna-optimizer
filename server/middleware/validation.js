@@ -17,7 +17,14 @@ const validateProjectPath = (req, res, next) => {
         );
     }
 
-    const validation = validatePath(projectPath);
+    // Normalize common client-side formatting issues:
+    // - surrounding quotes
+    // - trailing/leading whitespace or newlines
+    const cleanedProjectPath = String(projectPath)
+        .trim()
+        .replace(/^"+|"+$/g, '');
+
+    const validation = validatePath(cleanedProjectPath);
     if (!validation.valid) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json(
             createResponse(false, null, validation.error)

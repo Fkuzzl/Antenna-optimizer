@@ -256,7 +256,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
     } catch (error) {
       // Server unreachable — accept with warning
       setProjectLocationConfirmed(true);
-      setLocationValidationMessage('⚠️ Server not reachable — path accepted, verify server is running');
+      setLocationValidationMessage('⚠️ Server not reachable - path accepted, verify server is running');
       if (onSetProjectPath) onSetProjectPath(trimmed);
       await savePathToHistory(trimmed);
     }
@@ -796,7 +796,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
         >
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <Text style={styles.backButtonText}>← Back</Text>
+              <Text style={styles.backButtonText}>{'< Back'}</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Progressive Tuning</Text>
             <View style={{ width: 60 }} />
@@ -813,7 +813,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
             Please wait for the current session to finish, or stop it from the Progress page.
           </Text>
           <TouchableOpacity style={styles.blockedBackButton} onPress={onBack}>
-            <Text style={styles.blockedBackButtonText}>← Go Home</Text>
+            <Text style={styles.blockedBackButtonText}>{'< Go Home'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -843,7 +843,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
       >
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={projectLocationConfirmed ? resetProjectLocation : onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← {projectLocationConfirmed ? 'Change Location' : 'Back'}</Text>
+            <Text style={styles.backButtonText}>{'<'} {projectLocationConfirmed ? 'Change Location' : 'Back'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Progressive Tuning</Text>
           <View style={{ width: 60 }} />
@@ -968,7 +968,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                   <Text style={styles.confirmLocationText}>  Validating...</Text>
                 </View>
               ) : (
-                <Text style={styles.confirmLocationText}>✔ Confirm Location & Continue</Text>
+                <Text style={styles.confirmLocationText}>✔️ Confirm Location & Continue</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -1009,7 +1009,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                   />
                   {isDuplicate ? (
                     <Text style={[styles.hintText, { color: '#dc2626', fontWeight: '600' }]}>
-                      ⚠️ Profile "{antennaName.trim()}" already exists — choose a different name
+                      ⚠️ Profile "{antennaName.trim()}" already exists - choose a different name
                     </Text>
                   ) : (
                     <Text style={styles.hintText}>
@@ -1036,11 +1036,11 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                     <Text style={styles.runName}>{run.name}</Text>
                     <Text style={styles.runDetail}>
                       {run.status === 'complete' ? '✅ Complete'
-                       : run.status === 'invalid' ? '⚠️ Invalid — needs adjustment'
+                       : run.status === 'invalid' ? '⚠️ Invalid - needs adjustment'
                        : run.has_checkpoint ? '⏸️ Resumable' : '⏸️ Incomplete'}
-                      {(run.current_phase ?? run.phase) ? ` • Phase ${run.current_phase ?? run.phase}` : ''}
-                      {run.total_simulations ? ` • ${run.total_simulations} sims` : ''}
-                      {run.timestamp ? ` • ${new Date(run.timestamp).toLocaleDateString()}` : ''}
+                      {(run.current_phase ?? run.phase) ? ` | Phase ${run.current_phase ?? run.phase}` : ''}
+                      {run.total_simulations ? ` | ${run.total_simulations} sims` : ''}
+                      {run.timestamp ? ` | ${new Date(run.timestamp).toLocaleDateString()}` : ''}
                     </Text>
                   </View>
                   {run.status === 'incomplete' && (
@@ -1158,9 +1158,9 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                 {(lgxVal < ANTENNA_SIZE || lgyVal < ANTENNA_SIZE) ? (
                   <View style={styles.canvasSizeErrorBox}>
                     <Text style={styles.canvasSizeErrorText}>
-                      ⚠️ Ground plane must be at least {ANTENNA_SIZE}×{ANTENNA_SIZE}mm to contain the antenna.
-                      {lgxVal < ANTENNA_SIZE ? `\nLgx is ${lgxVal}mm — increase to at least ${ANTENNA_SIZE}mm.` : ''}
-                      {lgyVal < ANTENNA_SIZE ? `\nLgy is ${lgyVal}mm — increase to at least ${ANTENNA_SIZE}mm.` : ''}
+                      ⚠️ Ground plane must be at least {ANTENNA_SIZE}x{ANTENNA_SIZE}mm to contain the antenna.
+                      {lgxVal < ANTENNA_SIZE ? `\nLgx is ${lgxVal}mm - increase to at least ${ANTENNA_SIZE}mm.` : ''}
+                      {lgyVal < ANTENNA_SIZE ? `\nLgy is ${lgyVal}mm - increase to at least ${ANTENNA_SIZE}mm.` : ''}
                     </Text>
                   </View>
                 ) : (
@@ -1279,7 +1279,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                 {dxfFileName && dxfGndData ? (
                   <View>
                     <Text style={[styles.hintText, { color: '#16a34a' }]}>
-                      ✅ {dxfFileName} • {dxfGndData.bounds?.width?.toFixed(1)} × {dxfGndData.bounds?.height?.toFixed(1)} mm
+                      ✅ {dxfFileName} | {dxfGndData.bounds?.width?.toFixed(1)} x {dxfGndData.bounds?.height?.toFixed(1)} mm
                     </Text>
 
                     {/* Re-upload button */}
@@ -1390,7 +1390,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                           </Text>
                         )}
                         <Text style={styles.positionText}>
-                          Ground Plane: {lgxVal} × {lgyVal} mm (from DXF)
+                          Ground Plane: {lgxVal} x {lgyVal} mm (from DXF)
                         </Text>
                         {/* Fine-tune coordinate inputs */}
                         <View style={styles.fineTuneRow}>
@@ -1468,7 +1468,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
             style={styles.advancedToggle}
             onPress={() => setShowAdvanced(!showAdvanced)}
           >
-            <Text style={styles.advancedToggleIcon}>{showAdvanced ? '▼' : '▶'}</Text>
+            <Text style={styles.advancedToggleIcon}>{showAdvanced ? 'v' : '>'}</Text>
             <Text style={styles.advancedToggleText}>Advanced: Starting Variables</Text>
             {!showAdvanced && (
               <Text style={styles.advancedHint}>Using defaults from config</Text>
@@ -1520,7 +1520,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                 </View>
                 <View style={styles.phaseInfoContent}>
                   <Text style={styles.phaseInfoName}>{phase.name}</Text>
-                  <Text style={styles.phaseInfoTarget}>Target: {phase.target} • {phase.sims} sims</Text>
+                  <Text style={styles.phaseInfoTarget}>Target: {phase.target} | {phase.sims} sims</Text>
                   <Text style={styles.phaseInfoVars}>Variables: {phase.variables.join(', ')}</Text>
                 </View>
               </View>
@@ -1549,7 +1549,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
         {validationErrors.length > 0 && (
           <View style={styles.errorContainer}>
             {validationErrors.map((err, i) => (
-              <Text key={i} style={styles.errorText}>• {err}</Text>
+              <Text key={i} style={styles.errorText}>- {err}</Text>
             ))}
           </View>
         )}
@@ -1573,7 +1573,7 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
                 <Text style={styles.startButtonText}>  Starting...</Text>
               </View>
             ) : (
-              <Text style={styles.startButtonText}>🚀 Start Progressive Tuning</Text>
+              <Text style={styles.startButtonText}>Start Progressive Tuning</Text>
             )}
           </LinearGradient>
         </TouchableOpacity>

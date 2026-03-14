@@ -18,6 +18,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const progressiveTuningManager = require('../services/progressiveTuningManager');
+const { syncHfssPathForProject } = require('../services/hfssPathSync');
 const { createResponse } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
 const logger = require('../config/logger');
@@ -304,6 +305,14 @@ router.get('/runs', async (req, res) => {
             return res.status(HTTP_STATUS.BAD_REQUEST).json(
                 createResponse(false, null, `Project path does not exist: ${projectPath}`)
             );
+        }
+
+        const hfssSync = syncHfssPathForProject(projectPath);
+        if (hfssSync.updated) {
+            logger.info('[ProgressiveTuning] Synced HFSS path on project location confirmation', {
+                projectPath,
+                epConfigPath: hfssSync.epConfigPath,
+            });
         }
 
         const runs = await progressiveTuningManager.scanRuns(projectPath);
