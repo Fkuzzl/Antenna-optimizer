@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup Wizard</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #f3f6fb; color: #1f2937; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 24px; }
+    .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border-radius: 16px; padding: 24px; }
+    .title { font-size: 30px; font-weight: 700; margin: 0 0 8px 0; }
+    .subtitle { margin: 0; font-size: 14px; opacity: 0.95; }
+    .progress { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+    .step { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .dot { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+    .step.active .dot, .step.done .dot { background: #10b981; }
+
+    .card { background: white; border-radius: 16px; margin-top: 18px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
+    .row { margin-bottom: 18px; }
+    .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: block; }
+    .hint { color: #64748b; font-size: 12px; margin-top: 6px; }
+    .input-row { display: grid; grid-template-columns: 1fr 140px; gap: 10px; }
+    input { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px; }
+    button { border: 0; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .browse { background: #e2e8f0; color: #0f172a; }
+    .browse:hover { background: #cbd5e1; }
+
+    .status { margin-top: 14px; font-size: 13px; color: #334155; min-height: 18px; }
+    .status.success { color: #059669; font-weight: 600; }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .cancel { background: #e2e8f0; color: #0f172a; padding: 10px 16px; }
+    .save { background: #2563eb; color: white; padding: 10px 16px; }
+    .save:disabled { opacity: 0.6; cursor: default; }
+
+    .small { font-size: 12px; color: #475569; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1 class="title">Antenna Optimizer Setup Wizard</h1>
+      <p class="subtitle">Auto-detecting common install paths. Confirm the executable paths below to continue.</p>
+      <div class="progress">
+        <div class="step done"><span class="dot">1</span><span>Auto Detect</span></div>
+        <div class="step active"><span class="dot">2</span><span>Confirm Paths</span></div>
+        <div class="step"><span class="dot">3</span><span>Save Config</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <label class="label" for="matlabPath">MATLAB executable (matlab.exe)</label>
+        <div class="input-row">
+          <input id="matlabPath" placeholder="Select matlab.exe" />
+          <button class="browse" id="browseMatlab">Browse...</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="label" for="pythonPath">Python executable (python.exe)</label>
+        <div class="input-row">
+          <input id="pythonPath" placeholder="Select python.exe" />
+          <button class="browse" id="browsePython">Browse...</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="label" for="hfssPath">HFSS executable (ansysedt.exe)</label>
+        <div class="input-row">
+          <input id="hfssPath" placeholder="Select ansysedt.exe" />
+          <button class="browse" id="browseHfss">Browse...</button>
+        </div>
+      </div>
+
+      <div class="small">Config file will be generated at: <span id="configPath"></span></div>
+      <div class="status" id="status"></div>
+
+      <div class="actions">
+        <button class="cancel" id="cancelBtn">Cancel</button>
+        <button class="save" id="saveBtn">Save & Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      matlab: document.getElementById('matlabPath'),
+      python: document.getElementById('pythonPath'),
+      hfss: document.getElementById('hfssPath'),
+      status: document.getElementById('status'),
+      configPath: document.getElementById('configPath'),
+      save: document.getElementById('saveBtn')
+    };
+
+    function setStatus(message, isError = false) {
+      els.status.textContent = message || '';
+      els.status.style.color = isError ? '#dc2626' : '#334155';
+    }
+
+    async function browseForPath(kind) {
+      const defaults = {
+        matlab: { title: 'Select matlab.exe', buttonLabel: 'Select matlab.exe', defaultPath: els.matlab.value },
+        python: { title: 'Select python.exe', buttonLabel: 'Select python.exe', defaultPath: els.python.value },
+        hfss: { title: 'Select ansysedt.exe', buttonLabel: 'Select ansysedt.exe', defaultPath: els.hfss.value }
+      };
+
+      const result = await window.setupWizard.pickFile(defaults[kind]);
+      if (result && !result.canceled && result.path) {
+        if (kind === 'matlab') els.matlab.value = result.path;
+        if (kind === 'python') els.python.value = result.path;
+        if (kind === 'hfss') els.hfss.value = result.path;
+      }
+    }
+
+    async function saveAndContinue() {
+      try {
+        setStatus('Validating paths and checking Python libraries...');
+        els.save.disabled = true;
+        const result = await window.setupWizard.submit({
+          matlabPath: els.matlab.value.trim(),
+          pythonPath: els.python.value.trim(),
+          hfssPath: els.hfss.value.trim()
+        });
+
+        const deps = result?.pythonDependencies || {};
+        const installed = Array.isArray(deps.installed) ? deps.installed : [];
+        const dependencyMessage = installed.length
+          ? ` Installed missing Python libraries: ${installed.join(', ')}.`
+          : ' Python libraries already available.';
+
+        els.status.classList.add('success');
+        setStatus(`Configuration saved to ${result?.path || ''}.${dependencyMessage} Launching Antenna Optimizer...`);
+        setTimeout(async () => {
+          try {
+            await window.setupWizard.finish();
+          } catch (error) {
+            els.status.classList.remove('success');
+            els.save.disabled = false;
+            setStatus(error?.message || String(error), true);
+          }
+        }, 900);
+      } catch (error) {
+        els.status.classList.remove('success');
+        els.save.disabled = false;
+        setStatus(error?.message || String(error), true);
+      }
+    }
+
+    async function initialize() {
+      try {
+        setStatus('Detecting installed tools...');
+        const init = await window.setupWizard.getInitialData();
+        els.matlab.value = init.matlabPath || '';
+        els.python.value = init.pythonPath || '';
+        els.hfss.value = init.hfssPath || '';
+        els.configPath.textContent = init.setupConfigPath || '(unknown)';
+
+        const detectedCount = [init.matlabPath, init.pythonPath, init.hfssPath].filter(Boolean).length;
+        setStatus(`Auto-detection complete: ${detectedCount}/3 paths detected.`);
+      } catch (error) {
+        setStatus(error?.message || 'Failed to initialize setup wizard.', true);
+      }
+    }
+
+    document.getElementById('browseMatlab').addEventListener('click', () => browseForPath('matlab'));
+    document.getElementById('browsePython').addEventListener('click', () => browseForPath('python'));
+    document.getElementById('browseHfss').addEventListener('click', () => browseForPath('hfss'));
+    document.getElementById('saveBtn').addEventListener('click', saveAndContinue);
+    document.getElementById('cancelBtn').addEventListener('click', () => window.setupWizard.cancel());
+
+    initialize();
+  </script>
+</body>
+</html>
