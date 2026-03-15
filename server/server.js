@@ -36,6 +36,9 @@ const app = express();
 // Create HTTP server for WebSocket support
 const httpServer = http.createServer(app);
 
+const isDesktopMode = process.env.ELECTRON_DESKTOP === '1' || process.env.SERVE_DIST_WEB === '1';
+const distWebPath = path.join(__dirname, '..', 'dist-web');
+
 // Configure CORS
 app.use(cors({
     origin: '*',
@@ -84,6 +87,15 @@ app.get('/api/server/config', (req, res) => {
     });
 });
 
+// Desktop mode static host (Electron): serve exported Expo web bundle from backend origin.
+if (isDesktopMode && fs.existsSync(distWebPath)) {
+    app.use(express.static(distWebPath));
+
+    app.get('/', (req, res) => {
+        res.sendFile(path.join(distWebPath, 'index.html'));
+    });
+}
+
 // API Routes
 app.use('/api/integrated-results', resultsRoutes);
 // Backward-compat: only expose the /results endpoint under /api/simulation, not all results routes
@@ -97,6 +109,16 @@ app.use('/api/matlab', groundPlaneRoutes);
 app.use('/api/matlab', optimizationRoutes);
 app.use('/api/gnd', gndRoutes);
 app.use('/api/progressive-tuning', progressiveTuningRoutes);
+
+if (isDesktopMode && fs.existsSync(distWebPath)) {
+    app.use((req, res, next) => {
+        if (req.method !== 'GET') return next();
+        if (req.path.startsWith('/api/') || req.path === '/ws' || req.path === '/health') {
+            return next();
+        }
+        res.sendFile(path.join(distWebPath, 'index.html'));
+    });
+}
 
 // Initialize WebSocket server
 websocketManager.initialize(httpServer);

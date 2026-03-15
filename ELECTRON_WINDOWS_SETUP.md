@@ -34,10 +34,17 @@ npm run desktop:pack:win
 
 Output folder: `electron-dist/`
 
+If you hit `Cannot create symbolic link ... winCodeSign` on Windows:
+
+- Use the updated packaging script in this branch (it disables auto code-sign discovery).
+- Run PowerShell as Administrator if your machine has strict symlink policy.
+- Optional: Enable Windows Developer Mode to allow non-admin symlink creation.
+
 ## Notes
 
 - This is **Windows-first** implementation as requested.
 - Main branch can continue using Expo normally.
 - Backend server is started by Electron process (fork of `server/server.js`).
-- Configuration is still read from `OPEN_THIS/SETUP/setup_variable.json`.
+- On first desktop launch, config is created at `%APPDATA%\\Antenna Optimizer\\setup_variable.json`.
+- Desktop mode uses this user config path (via `SETUP_CONFIG_PATH`) and falls back to bundled config only if needed.
 - If production app fails to load UI bundle, run `npm run desktop:web:build` first.

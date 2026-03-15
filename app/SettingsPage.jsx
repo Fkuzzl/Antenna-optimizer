@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { showAlert } from './app_config';
 
 const SettingsPage = ({ onBack }) => {
   const [serverConfig, setServerConfig] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [desktopSetupPath, setDesktopSetupPath] = useState('');
+  const [wizardRunning, setWizardRunning] = useState(false);
+  const isElectronDesktop = typeof window !== 'undefined' && !!window.desktopEnv?.isElectron;
 
   useEffect(() => {
     fetchServerConfig();
+    if (isElectronDesktop && window.desktopEnv?.getSetupConfigPath) {
+      window.desktopEnv.getSetupConfigPath()
+        .then((value) => setDesktopSetupPath(value || ''))
+        .catch(() => setDesktopSetupPath(''));
+    }
   }, []);
 
   const fetchServerConfig = async () => {
@@ -27,11 +35,38 @@ const SettingsPage = ({ onBack }) => {
   };
 
   const openSetupWizard = () => {
-    const message = 'To reconfigure settings, run the setup wizard:\n\n' +
-                   'Windows: Double-click OPEN_THIS/run_setup.bat\n' +
-                   'Command: npm run setup';
+    const message = isElectronDesktop
+      ? 'Desktop (EXE) mode:\n\nUse "Run Setup Wizard" to reconfigure MATLAB, Python, and HFSS paths.\n\nThe app will guide you file-by-file and then save config automatically.'
+      : 'To reconfigure settings, run the setup wizard:\n\n' +
+        'Windows: Double-click OPEN_THIS/run_setup.bat\n' +
+        'Command: npm run setup';
     
     showAlert('Run Setup Wizard', message);
+  };
+
+  const runDesktopSetupWizard = async () => {
+    if (!window.desktopEnv?.runSetupWizard || wizardRunning) return;
+
+    try {
+      setWizardRunning(true);
+      const result = await window.desktopEnv.runSetupWizard();
+      if (!result?.ok) {
+        showAlert('Setup Wizard', result?.error || 'Setup cancelled.');
+        return;
+      }
+
+      if (window.desktopEnv?.getSetupConfigPath) {
+        const pathValue = await window.desktopEnv.getSetupConfigPath();
+        setDesktopSetupPath(pathValue || desktopSetupPath);
+      }
+
+      showAlert('Setup Wizard', 'Configuration updated successfully.');
+      await fetchServerConfig();
+    } catch (error) {
+      showAlert('Setup Wizard', `Failed to run setup wizard.\n${error.message || error}`);
+    } finally {
+      setWizardRunning(false);
+    }
   };
 
   const InfoItem = ({ icon, label, value }) => (
@@ -130,15 +165,25 @@ const SettingsPage = ({ onBack }) => {
               <Text style={styles.infoTitle}>Configuration Location</Text>
               <Text style={styles.infoText}>
                 System paths are configured in:{'\n'}
-                OPEN_THIS/SETUP/setup_variable.json{'\n\n'}
+                {isElectronDesktop
+                  ? (desktopSetupPath || '%APPDATA%\\Antenna Optimizer\\setup_variable.json')
+                  : 'OPEN_THIS/SETUP/setup_variable.json'}{'\n\n'}
                 Contains:{' \n'}
                 - MATLAB installation path (where MATLAB.exe is located){'\n'}
                 - Python executable path (for processing scripts){'\n'}
                 - Project directories (where optimization files are stored){'\n\n'}
-                To update: Run OPEN_THIS/run_setup.bat
+                To update: {isElectronDesktop ? 'Run Setup Wizard (below)' : 'Run OPEN_THIS/run_setup.bat'}
               </Text>
             </View>
           </View>
+
+          {isElectronDesktop && (
+            <View style={styles.desktopButtonRowSingle}>
+              <TouchableOpacity style={styles.desktopActionButton} onPress={runDesktopSetupWizard} activeOpacity={0.8} disabled={wizardRunning}>
+                <Text style={styles.desktopActionButtonText}>{wizardRunning ? 'Running Setup Wizard...' : 'Run Setup Wizard'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Feature Configuration Section */}
@@ -172,7 +217,7 @@ const SettingsPage = ({ onBack }) => {
 
         {/* Reconfigure Section */}
         <View style={styles.resetSection}>
-          <TouchableOpacity style={styles.resetButton} onPress={openSetupWizard} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.resetButton} onPress={isElectronDesktop ? runDesktopSetupWizard : openSetupWizard} activeOpacity={0.8}>
             <LinearGradient
               colors={['#3b82f6', '#2563eb']}
               style={styles.resetButtonGradient}
@@ -183,7 +228,7 @@ const SettingsPage = ({ onBack }) => {
           </TouchableOpacity>
           
           <Text style={styles.resetHint}>
-            To change server address, MATLAB path, or Python path, run the setup wizard
+            To change MATLAB, Python, or HFSS path, run the setup wizard
           </Text>
         </View>
       </ScrollView>
@@ -228,6 +273,9 @@ const styles = StyleSheet.create({
   infoContent: { flex: 1 },
   infoTitle: { fontSize: 14, fontWeight: '600', color: '#1e40af', marginBottom: 4 },
   infoText: { fontSize: 12, color: '#1e40af', lineHeight: 16 },
+  desktopButtonRowSingle: { paddingHorizontal: 20, paddingBottom: 16 },
+  desktopActionButton: { flex: 1, backgroundColor: '#2563eb', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  desktopActionButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
 
   // Feature Cards - List of system features with icons and descriptions
   featureCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },

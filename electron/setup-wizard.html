@@ -148,6 +148,10 @@
 
     async function initialize() {
       try {
+        if (!window.setupWizard) {
+          throw new Error('Setup bridge is not available. Please restart the application.');
+        }
+
         setStatus('Detecting installed tools...');
         const init = await window.setupWizard.getInitialData();
         els.matlab.value = init.matlabPath || '';

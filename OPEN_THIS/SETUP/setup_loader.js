@@ -5,12 +5,33 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 class SetupConfigLoader {
     constructor() {
-        this.configPath = path.join(__dirname, 'setup_variable.json');
+        this.configPath = this.resolveConfigPath();
         this.config = null;
         this.loaded = false;
+    }
+
+    /**
+     * Resolve setup config path with priority:
+     * 1) Explicit env override (SETUP_CONFIG_PATH)
+     * 2) User profile config (APPDATA/Antenna Optimizer/setup_variable.json)
+     * 3) Bundled default config in OPEN_THIS/SETUP
+     */
+    resolveConfigPath() {
+        if (process.env.SETUP_CONFIG_PATH && process.env.SETUP_CONFIG_PATH.trim()) {
+            return path.resolve(process.env.SETUP_CONFIG_PATH.trim());
+        }
+
+        const appDataBase = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+        const userConfigPath = path.join(appDataBase, 'Antenna Optimizer', 'setup_variable.json');
+        if (fs.existsSync(userConfigPath)) {
+            return userConfigPath;
+        }
+
+        return path.join(__dirname, 'setup_variable.json');
     }
 
     /**
@@ -48,7 +69,7 @@ class SetupConfigLoader {
             
             this.loaded = true;
 
-            console.log('✅ Loaded configuration from setup_variable.json');
+            console.log(`✅ Loaded configuration from: ${this.configPath}`);
             return this.config;
         } catch (error) {
             console.error('❌ Failed to load configuration:', error.message);

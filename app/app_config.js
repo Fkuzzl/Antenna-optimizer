@@ -1,21 +1,32 @@
 // Configuration loader for React Native app
-// This file automatically loads configuration from OPEN_THIS/SETUP/setup_variable.json
+// This file loads baseline configuration from OPEN_THIS/SETUP/setup_variable.json
 // 
-// ⚠️ IMPORTANT: To change server IP, port, or other settings:
-//    Edit: OPEN_THIS/SETUP/setup_variable.json (ONE FILE FOR ALL CONFIGURATION)
-//    This file will automatically read those values.
+// ⚠️ IMPORTANT:
+// - Desktop EXE users should use the in-app Setup Wizard to configure paths.
+// - Source/dev users can still run OPEN_THIS/run_setup.bat or npm run setup.
 
 import { Alert, Platform } from 'react-native';
 import setupVariableConfig from '../OPEN_THIS/SETUP/setup_variable.json';
 
 // Load configuration from the centralized setup file
 const config = setupVariableConfig;
+const isElectronDesktop = typeof window !== 'undefined' && !!window.desktopEnv?.isElectron;
+const resolvedServerHost = isElectronDesktop ? '127.0.0.1' : config.server.host;
+const resolvedServerPort = (() => {
+  if (isElectronDesktop && typeof window !== 'undefined') {
+    const runtimePort = Number(window.location?.port || 0);
+    if (Number.isInteger(runtimePort) && runtimePort > 0) {
+      return runtimePort;
+    }
+  }
+  return config.server.port || 3001;
+})();
 
 const AppConfig = {
   // Server configuration - loaded from setup_variable.json
   server: {
-    host: config.server.host,
-    port: config.server.port,
+    host: resolvedServerHost,
+    port: resolvedServerPort,
     subnet: config.network.subnet || '192.168.3.x',  // For display in error messages
   },
   
@@ -31,7 +42,7 @@ const AppConfig = {
   // Network configuration - loaded from setup_variable.json
   network: {
     allowedOrigins: config.network.allowed_origins || [
-      `http://${config.server.host}:${config.server.port}`,
+      `http://${resolvedServerHost}:${resolvedServerPort}`,
       'http://localhost:3001',
       'http://127.0.0.1:3001',
     ]
@@ -77,7 +88,7 @@ export const validateConfig = () => {
     console.log(`✅ Configuration loaded from setup_variable.json`);
     console.log(`   Server: ${AppConfig.serverUrl}`);
     console.log(`   WebSocket: ${AppConfig.websocketUrl}`);
-    console.log(`   💡 To change settings, edit: OPEN_THIS/SETUP/setup_variable.json`);
+    console.log(`   💡 To change settings in desktop app, use Setup Wizard in Settings`);
   }
   
   return {

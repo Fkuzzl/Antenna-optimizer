@@ -4,9 +4,17 @@
  */
 
 module.exports = {
+    // Runtime-resolved server port (allows Electron desktop to select free port)
+    // Falls back to 3001 when env vars are absent/invalid.
     // Server configuration
     SERVER: {
-        PORT: 3001,
+        PORT: (() => {
+            const rawPort = Number(process.env.SERVER_PORT || process.env.PORT || 3001);
+            if (Number.isInteger(rawPort) && rawPort > 0 && rawPort < 65536) {
+                return rawPort;
+            }
+            return 3001;
+        })(),
         DEFAULT_PAGE_SIZE: 100,
         MAX_PAGE_SIZE: 500,
     },

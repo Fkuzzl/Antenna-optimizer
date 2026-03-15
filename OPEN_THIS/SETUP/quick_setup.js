@@ -6,7 +6,10 @@ const readline = require('readline');
 
 class QuickSetup {
     constructor() {
-        this.configPath = path.join(__dirname, 'setup_variable.json');
+        this.configPath = process.env.SETUP_CONFIG_PATH && process.env.SETUP_CONFIG_PATH.trim()
+            ? path.resolve(process.env.SETUP_CONFIG_PATH.trim())
+            : path.join(__dirname, 'setup_variable.json');
+        this.isHeadlessAuto = process.argv.includes('--headless-auto');
         this.detectedConfig = {};
         this.rl = readline.createInterface({
             input: process.stdin,
@@ -19,6 +22,16 @@ class QuickSetup {
         console.log('========================================');
         console.log('   ANTENNA OPTIMIZER - QUICK SETUP');
         console.log('========================================\n');
+
+        if (this.isHeadlessAuto) {
+            console.log('⚙️  Running in headless auto mode...\n');
+            await this.autoDetect();
+            this.applyHeadlessDefaults();
+            await this.saveConfiguration();
+            console.log('✅ Headless setup completed\n');
+            this.rl.close();
+            return;
+        }
 
         // Step 1: Check system dependencies
         await this.checkDependencies();
@@ -44,6 +57,20 @@ class QuickSetup {
         console.log(`   3. The application will automatically pop out in browser, or you can open it manually at http://${this.detectedConfig.ip}:8081\n`);
         
         this.rl.close();
+    }
+
+    applyHeadlessDefaults() {
+        this.detectedConfig.ip = (this.detectedConfig.ip || '127.0.0.1').trim();
+        this.detectedConfig.matlab = (this.detectedConfig.matlab || '').trim();
+        this.detectedConfig.python = (this.detectedConfig.python || '').trim();
+        this.detectedConfig.hfssExe = (this.detectedConfig.hfssExe || '').trim();
+        this.detectedConfig.port = Number.isInteger(this.detectedConfig.port) ? this.detectedConfig.port : 3001;
+    }
+
+    getSubnet(ipAddress) {
+        const lastDot = String(ipAddress || '').lastIndexOf('.');
+        if (lastDot <= 0) return '127.0.0.x';
+        return `${String(ipAddress).substring(0, lastDot)}.x`;
     }
 
     async autoDetect() {
@@ -528,7 +555,7 @@ class QuickSetup {
                 "test_files_dir": path.join(projectRoot, 'test_files')
             },
             "network": {
-                "subnet": this.detectedConfig.ip.substring(0, this.detectedConfig.ip.lastIndexOf('.')) + '.x',
+                "subnet": this.getSubnet(this.detectedConfig.ip),
                 "allowed_origins": [
                     `http://${this.detectedConfig.ip}:${this.detectedConfig.port}`,
                     `http://localhost:${this.detectedConfig.port}`,
@@ -542,6 +569,8 @@ class QuickSetup {
                 "status_polling_interval_ms": 3000
             }
         };
+
+        fs.mkdirSync(path.dirname(this.configPath), { recursive: true });
 
         fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf8');
         console.log(`✅ Configuration saved to: ${this.configPath}\n`);

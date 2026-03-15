@@ -298,7 +298,7 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
 
       <ScrollView style={styles.content}>
         <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Simulation Results (Paginated)</Text>
+          <Text style={styles.infoTitle}>Simulation Results</Text>
           <Text style={styles.infoText}>
             Results loaded in pages of 100 iterations. Page 1 = oldest (iter 1-100), last page = newest iterations. Loads latest by default.
           </Text>
