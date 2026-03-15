@@ -10,16 +10,48 @@ import setupVariableConfig from '../OPEN_THIS/SETUP/setup_variable.json';
 
 // Load configuration from the centralized setup file
 const config = setupVariableConfig;
-const isElectronDesktop = typeof window !== 'undefined' && !!window.desktopEnv?.isElectron;
-const resolvedServerHost = isElectronDesktop ? '127.0.0.1' : config.server.host;
+const hasWindow = typeof window !== 'undefined';
+const isElectronDesktop = hasWindow && !!window.desktopEnv?.isElectron;
+const isBrowserRuntime = hasWindow && !isElectronDesktop;
+
+const resolvedServerHost = (() => {
+  if (isElectronDesktop) {
+    return '127.0.0.1';
+  }
+
+  if (isBrowserRuntime) {
+    const runtimeHost = String(window.location?.hostname || '').trim();
+    if (runtimeHost) {
+      return runtimeHost;
+    }
+  }
+
+  return config.server.host;
+})();
+
 const resolvedServerPort = (() => {
-  if (isElectronDesktop && typeof window !== 'undefined') {
+  if (isElectronDesktop && hasWindow) {
     const runtimePort = Number(window.location?.port || 0);
     if (Number.isInteger(runtimePort) && runtimePort > 0) {
       return runtimePort;
     }
   }
+
+  if (isBrowserRuntime && hasWindow) {
+    const runtimePort = Number(window.location?.port || 0);
+    if (Number.isInteger(runtimePort) && runtimePort > 0) {
+      return runtimePort;
+    }
+  }
+
   return config.server.port || 3001;
+})();
+
+const resolvedWebSocketProtocol = (() => {
+  if (hasWindow && String(window.location?.protocol || '').toLowerCase() === 'https:') {
+    return 'wss';
+  }
+  return 'ws';
 })();
 
 const AppConfig = {
@@ -36,7 +68,7 @@ const AppConfig = {
   },
   
   get websocketUrl() {
-    return `ws://${this.server.host}:${this.server.port}${config.server.websocket.path}`;
+    return `${resolvedWebSocketProtocol}://${this.server.host}:${this.server.port}${config.server.websocket.path}`;
   },
   
   // Network configuration - loaded from setup_variable.json
