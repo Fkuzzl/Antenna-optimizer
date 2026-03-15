@@ -34,6 +34,48 @@ npm run desktop:pack:win
 
 Output folder: `electron-dist/`
 
+### Automated post-build code signing (optional)
+
+`desktop:pack:win` now runs a post-build signing step automatically.
+
+- If signing variables are configured, installer EXE is code-signed.
+- If variables are not configured, signing is skipped (build still succeeds).
+
+Set one of these before packaging:
+
+1. **PFX certificate file mode**
+
+```powershell
+$env:WIN_CERT_FILE='C:\path\to\codesign.pfx'
+$env:WIN_CERT_PASSWORD='your-password'
+```
+
+2. **Certificate store thumbprint mode**
+
+```powershell
+$env:WIN_CERT_SHA1='YOUR_CERT_THUMBPRINT'
+```
+
+Optional:
+
+```powershell
+$env:SIGNTOOL_PATH='C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe'
+$env:WIN_SIGN_TIMESTAMP_URL='http://timestamp.digicert.com'
+```
+
+Useful commands:
+
+```bash
+# Build + auto-sign (or skip signing if env vars missing)
+npm run desktop:pack:win
+
+# Build only (no post-build signing step)
+npm run desktop:pack:win:unsigned
+
+# Sign latest generated installer manually
+npm run desktop:sign:win
+```
+
 If you hit `Cannot create symbolic link ... winCodeSign` on Windows:
 
 - Use the updated packaging script in this branch (it disables auto code-sign discovery).

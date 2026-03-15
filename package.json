@@ -18,7 +18,9 @@
     "desktop:dev": "concurrently -k -n SERVER,WEB,ELECTRON -c green,blue,magenta \"npm run server\" \"npm run web -- --port 8081 --host localhost\" \"wait-on tcp:3001 http://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 electron electron/main.js\"",
     "desktop:clean": "node scripts/clean-electron-build.js",
     "desktop:web:build": "expo export --platform web --output-dir dist-web",
-    "desktop:pack:win": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
+    "desktop:sign:win": "node scripts/sign-windows-installer.js",
+    "desktop:pack:win": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis && npm run desktop:sign:win",
+    "desktop:pack:win:unsigned": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
     "desktop:pack:dir": "npm run desktop:clean && npm run desktop:web:build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win dir"
   },
   "dependencies": {
