@@ -12,6 +12,7 @@ class ProcessManager {
         this.currentExecutionState = {
             isRunning: false,
             fileName: null,
+            profileName: null,
             startTime: null,
             processId: null,
             filePath: null,
@@ -178,6 +179,7 @@ class ProcessManager {
         this.currentExecutionState = {
             isRunning: false,
             fileName: null,
+            profileName: null,
             startTime: null,
             processId: null,
             filePath: null,

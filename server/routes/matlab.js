@@ -10,6 +10,8 @@ const { spawn, exec } = require('child_process');
 const processManager = require('../services/processManager');
 const progressiveTuningManager = require('../services/progressiveTuningManager');
 const websocketManager = require('../services/websocketManager');
+const { createMoeaProfile } = require('../services/moeaProfileManager');
+const { getVerificationRuntimeState } = require('../services/moeaVerificationManager');
 const { syncHfssPathForProject } = require('../services/hfssPathSync');
 const { createResponse } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
@@ -39,6 +41,11 @@ function getConfiguredMatlabExecutable() {
         // fallback below
     }
     return 'matlab';
+}
+
+function normalizeProfileName(value) {
+    const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+    return normalized || null;
 }
 
 /**
@@ -139,6 +146,69 @@ async function terminateAllHFSSProcesses(forceKill = false) {
 }
 
 /**
+ * GET /api/matlab/runtime-state
+ * Unified runtime detector used by UI to auto-navigate user to the correct page.
+ * stage values:
+ *  - progressive_tuning_running
+ *  - final_simulation_running
+ *  - final_simulation_finished
+ *  - moea_tuning_running
+ *  - idle
+ */
+router.get('/runtime-state', async (req, res) => {
+    try {
+        const matlabState = processManager.getState();
+        const tuningState = progressiveTuningManager.getState();
+        const tuningStatus = await progressiveTuningManager.getStatus();
+        const verificationRuntime = await getVerificationRuntimeState(tuningState.projectPath || matlabState.projectPath || null);
+
+        const tuningManagerStatus = tuningState.status || tuningStatus?.status;
+        const progressiveRunning = tuningManagerStatus === 'running' || tuningManagerStatus === 'paused' || tuningManagerStatus === 'stopping';
+
+        let stage = 'idle';
+        let context = null;
+
+        if (progressiveRunning) {
+            stage = 'progressive_tuning_running';
+            context = {
+                projectPath: tuningState.projectPath,
+                status: tuningManagerStatus,
+                currentPhase: tuningStatus?.current_phase || 0,
+            };
+        } else if (verificationRuntime?.hasActiveVerification && verificationRuntime?.activeVerification) {
+            stage = 'final_simulation_running';
+            context = verificationRuntime.activeVerification;
+        } else if (verificationRuntime?.latestFinishedVerification) {
+            stage = 'final_simulation_finished';
+            context = verificationRuntime.latestFinishedVerification;
+        } else if (matlabState?.isRunning) {
+            stage = 'moea_tuning_running';
+            context = {
+                projectPath: matlabState.projectPath || matlabState.fileDir || matlabState.filePath || null,
+                fileName: matlabState.fileName || null,
+                startTime: matlabState.startTime || null,
+                processId: matlabState.processId || null,
+            };
+        }
+
+        return res.json({
+            success: true,
+            stage,
+            context,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        logger.error('[runtime-state] Failed to determine runtime state', { error: error.message });
+        return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+            success: false,
+            stage: 'idle',
+            context: null,
+            message: error.message,
+        });
+    }
+});
+
+/**
  * GET /api/matlab/status
  * Get current MATLAB execution status with process details
  */
@@ -152,6 +222,25 @@ router.get('/status', async (req, res) => {
         
         // Update state based on actual processes
         if (state.isRunning && !matlabRunning) {
+            try {
+                const projectPathForSnapshot = state.projectPath || state.fileDir || state.filePath;
+                if (projectPathForSnapshot) {
+                    await createMoeaProfile(projectPathForSnapshot, {
+                        status: 'completed',
+                        reason: 'normal-finish',
+                        trigger: 'status-transition',
+                        profileName: normalizeProfileName(state.profileName),
+                    });
+                    logger.info('[MOEAProfile] Completion profile snapshot created on status transition', {
+                        projectPath: projectPathForSnapshot,
+                    });
+                }
+            } catch (profileError) {
+                logger.warn('[MOEAProfile] Failed to create completion snapshot', {
+                    error: profileError.message,
+                    projectPath: state.projectPath || state.fileDir || state.filePath,
+                });
+            }
             processManager.updateState({ isRunning: false });
         } else if (!state.isRunning && matlabRunning && !state.fileName) {
             processManager.updateState({
@@ -232,7 +321,9 @@ router.get('/status', async (req, res) => {
  */
 router.post('/run', async (req, res) => {
     try {
-        const { projectPath, filePath: legacyFilePath } = req.body;
+        const { projectPath, filePath: legacyFilePath, profileName: requestedProfileName } = req.body;
+            const normalizedProfileName = normalizeProfileName(requestedProfileName);
+
         const rawInput = projectPath || legacyFilePath;
         const inputPath = rawInput ? path.normalize(rawInput.trim()) : null;
 
@@ -301,6 +392,7 @@ router.post('/run', async (req, res) => {
             cwd: fileDir,
             metadata: {
                 fileName,
+                profileName: normalizedProfileName,
                 filePath: scriptFile,
                 fileDir,
                 projectPath: resolvedProjectPath
@@ -313,6 +405,25 @@ router.post('/run', async (req, res) => {
                 const matlabProcesses = await getMatlabProcesses();
                 if (matlabProcesses.length === 0) {
                     logger.info('MATLAB process no longer detected in system, updating state');
+                    try {
+                        const runningState = processManager.getState();
+                        const projectPathForSnapshot = runningState.projectPath || runningState.fileDir || runningState.filePath;
+                        if (projectPathForSnapshot) {
+                            await createMoeaProfile(projectPathForSnapshot, {
+                                status: 'completed',
+                                reason: 'normal-finish',
+                                trigger: 'process-watchdog',
+                                profileName: normalizeProfileName(runningState.profileName),
+                            });
+                            logger.info('[MOEAProfile] Completion profile snapshot created from process watchdog', {
+                                projectPath: projectPathForSnapshot,
+                            });
+                        }
+                    } catch (profileError) {
+                        logger.warn('[MOEAProfile] Failed to create completion snapshot from watchdog', {
+                            error: profileError.message,
+                        });
+                    }
                     processManager.reset();
                     clearInterval(processCheckInterval);
                     // Broadcast status change
@@ -355,6 +466,28 @@ router.post('/run', async (req, res) => {
  */
 router.post('/stop', async (req, res) => {
     try {
+        const state = processManager.getState();
+        const projectPathForSnapshot = state.projectPath || state.fileDir || state.filePath;
+        if (state.isRunning && projectPathForSnapshot) {
+            try {
+                const snapshot = await createMoeaProfile(projectPathForSnapshot, {
+                    status: 'stopped',
+                    reason: 'manual-stop',
+                    trigger: 'stop-endpoint',
+                    profileName: normalizeProfileName(state.profileName),
+                });
+                logger.info('[MOEAProfile] Manual stop profile snapshot created', {
+                    projectPath: projectPathForSnapshot,
+                    profileId: snapshot.profileId,
+                });
+            } catch (profileError) {
+                logger.warn('[MOEAProfile] Failed to create manual stop snapshot', {
+                    error: profileError.message,
+                    projectPath: projectPathForSnapshot,
+                });
+            }
+        }
+
         // Hard kill for both MOEA and Progressive Tuning
         logger.info('Stop request - terminating processes...');
         if (progressiveTuningManager.isRunning()) {
@@ -572,6 +705,7 @@ router.post('/check-file', (req, res) => {
                 updated: !!hfssPathSync.updated,
                 reason: hfssPathSync.reason,
                 epConfigPath: hfssPathSync.epConfigPath || null,
+                verificationConfigPath: hfssPathSync.verificationConfigPath || null,
             }
         };
         

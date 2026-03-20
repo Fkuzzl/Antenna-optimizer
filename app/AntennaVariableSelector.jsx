@@ -52,7 +52,7 @@ const tryFetchWithMultipleUrls = async (endpoint, options) => {
   throw lastError;
 };
 
-export default function AntennaVariableSelector({ onBack, projectPath, onOptimizationManagement }) {
+export default function AntennaVariableSelector({ onBack, projectPath }) {
   // State for dynamically loaded variables from backend API
   const [antennaVariables, setAntennaVariables] = useState([]);
   const [isLoadingVariables, setIsLoadingVariables] = useState(true);
@@ -61,7 +61,6 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
   const [optimizeAllMode, setOptimizeAllMode] = useState(true); // New: toggle between optimize all vs custom
   const [fModelExists, setFModelExists] = useState(null); // null = not checked, true = exists, false = doesn't exist
   const [isCheckingPath, setIsCheckingPath] = useState(false);
-  const [manageOptimizationData, setManageOptimizationData] = useState(false);
   const [showGroundPlaneConfig, setShowGroundPlaneConfig] = useState(false);
   
   // Track whether user has explicitly configured ground plane
@@ -305,35 +304,12 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
     
     const proceedWithCreation = async () => {
       try {
-        let optimizationResult = null;
-        
-        // Step 1: Handle optimization management if enabled
-        if (manageOptimizationData && onOptimizationManagement) {
-          const managementResult = await onOptimizationManagement();
-          if (!managementResult.success) {
-            return; // Operation failed or was cancelled
-          }
-          optimizationResult = managementResult.result;
-        }
-
-        // Step 2: Create F_Model_Element file
+        // Create F_Model_Element file
         await executeFileCreation();
 
-        // Step 3: Show completion notification with accurate information
-        let completionMessage = '';
-        
+        // Show completion notification
         const optimizedCount = optimizeAllMode ? antennaVariables.length : antennaVariables.length - excludedVariables.size;
-        
-        if (manageOptimizationData && optimizationResult) {
-          // Build dynamic message based on what actually happened
-          if (optimizationResult.optimizationExists) {
-            completionMessage = `File created successfully!\n\nOld optimization data backed up.\nGround plane configured.\n${optimizedCount} variables optimizing.`;
-          } else {
-            completionMessage = `File created successfully!\n\n${optimizedCount} variables optimizing.\nGround plane configured.\nReady for optimization.`;
-          }
-        } else {
-          completionMessage = `File created successfully!\n\n${optimizedCount} variables optimizing.\nGround plane configured.\nExisting data preserved.`;
-        }
+        const completionMessage = `File created successfully!\n\n${optimizedCount} variables optimizing.\nGround plane configured.\nReady for optimization.`;
 
         showAlert('✅ Complete', completionMessage, [{
           text: 'OK',
@@ -716,7 +692,7 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
 
       {/* Control Panel */}
       <View style={styles.controlPanel}>
-        {/* Top Row: Two Toggles Side by Side */}
+        {/* Top Row: Optimization mode toggle */}
         <View style={styles.topTogglesRow}>
           {/* Left: Optimization Mode Toggle */}
           <View style={[
@@ -743,29 +719,6 @@ export default function AntennaVariableSelector({ onBack, projectPath, onOptimiz
               }}
               trackColor={{ false: '#fef3c7', true: '#dbeafe' }}
               thumbColor={optimizeAllMode ? '#3b82f6' : '#f59e0b'}
-            />
-          </View>
-
-          {/* Right: Optimization Data Management Toggle */}
-          <View style={[
-            styles.optimizationDataToggleCompact,
-            manageOptimizationData ? styles.toggleCleanMode : styles.toggleKeepMode
-          ]}>
-            <View style={styles.toggleInfoCompact}>
-              <Text style={styles.toggleTitleCompact}>
-                {manageOptimizationData ? '🗑️ Clean Previous Data' : '🔄 Keep Existing Data'}
-              </Text>
-              <Text style={styles.toggleDescriptionCompact}>
-                {manageOptimizationData 
-                  ? 'Backup old results and configuation files' 
-                  : 'Hold existing simulation result'}
-              </Text>
-            </View>
-            <Switch
-              value={manageOptimizationData}
-              onValueChange={setManageOptimizationData}
-              trackColor={{ false: '#dcfce7', true: '#fef3c7' }}
-              thumbColor={manageOptimizationData ? '#f59e0b' : '#10b981'}
             />
           </View>
         </View>
@@ -969,9 +922,8 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 14, color: '#6b7280', fontWeight: '500', marginLeft: 4 },
 
   // Toggle Components - Switches for optimization mode (all/custom) and data management (keep/clean)
-  topTogglesRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  topTogglesRow: { marginBottom: 16 },
   optimizationModeToggleCompact: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 2 },
-  optimizationDataToggleCompact: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1 },
   toggleInfoCompact: { flex: 1, marginRight: 8 },
   toggleTitleCompact: { fontSize: 12, fontWeight: '700', color: '#1e293b', marginBottom: 3 },
   toggleDescriptionCompact: { fontSize: 10, color: '#64748b', lineHeight: 13 },

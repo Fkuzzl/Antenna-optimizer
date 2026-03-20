@@ -19,6 +19,67 @@ function normalizePathValue(value) {
     return value.trim().replace(/\//g, '\\').replace(/\\+$/g, '').toLowerCase();
 }
 
+function syncConfigFile(configPath, configuredHfssPath, options = {}) {
+    const { cleanupNestedHfssPath = false } = options;
+
+    if (!fs.existsSync(configPath)) {
+        return {
+            configPath,
+            exists: false,
+            updated: false,
+            reason: 'config_missing',
+        };
+    }
+
+    try {
+        const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (!raw || typeof raw !== 'object') {
+            return {
+                configPath,
+                exists: true,
+                updated: false,
+                reason: 'invalid_json',
+            };
+        }
+
+        const currentHfssPath = raw.hfssExePath || raw?.hfss?.exe_path || null;
+        if (normalizePathValue(currentHfssPath) === normalizePathValue(configuredHfssPath)) {
+            return {
+                configPath,
+                exists: true,
+                updated: false,
+                reason: 'already_synced',
+                currentHfssPath,
+            };
+        }
+
+        raw.hfssExePath = configuredHfssPath;
+
+        if (cleanupNestedHfssPath && raw.hfss && typeof raw.hfss === 'object' && 'exe_path' in raw.hfss) {
+            delete raw.hfss.exe_path;
+            if (Object.keys(raw.hfss).length === 0) {
+                delete raw.hfss;
+            }
+        }
+
+        fs.writeFileSync(configPath, JSON.stringify(raw, null, 2), 'utf8');
+        return {
+            configPath,
+            exists: true,
+            updated: true,
+            reason: 'updated',
+            previousHfssPath: currentHfssPath,
+        };
+    } catch {
+        return {
+            configPath,
+            exists: true,
+            updated: false,
+            reason: 'write_error',
+        };
+    }
+}
+
 function syncHfssPathForProject(projectPath) {
     if (!projectPath || typeof projectPath !== 'string') {
         return { updated: false, reason: 'invalid_project_path' };
@@ -36,49 +97,39 @@ function syncHfssPathForProject(projectPath) {
     }
 
     const epConfigPath = path.join(normalizedProjectPath, 'Function', 'EARLY_PHASE', 'Config', 'EP_Config.json');
-    if (!fs.existsSync(epConfigPath)) {
-        return { updated: false, reason: 'ep_config_missing', epConfigPath, configuredHfssPath };
-    }
+    const verificationConfigPath = path.join(normalizedProjectPath, 'Function', 'VERIFICATION', 'Config', 'Verification_Config.json');
 
-    try {
-        const raw = JSON.parse(fs.readFileSync(epConfigPath, 'utf8'));
-        if (!raw || typeof raw !== 'object') {
-            return { updated: false, reason: 'invalid_json', epConfigPath, configuredHfssPath };
-        }
+    const epResult = syncConfigFile(epConfigPath, configuredHfssPath, { cleanupNestedHfssPath: true });
+    const verificationResult = syncConfigFile(verificationConfigPath, configuredHfssPath, { cleanupNestedHfssPath: false });
 
-        const currentHfssPath = raw.hfssExePath || raw?.hfss?.exe_path || null;
-        if (normalizePathValue(currentHfssPath) === normalizePathValue(configuredHfssPath)) {
-            return {
-                updated: false,
-                reason: 'already_synced',
-                epConfigPath,
-                configuredHfssPath,
-                currentHfssPath,
-            };
-        }
+    const updated = !!(epResult.updated || verificationResult.updated);
+    const targets = [epResult, verificationResult];
+    const missingBoth = targets.every((item) => item.reason === 'config_missing');
+    const allAlreadySynced = targets.every((item) => item.reason === 'already_synced');
+    const hasWriteError = targets.some((item) => item.reason === 'write_error' || item.reason === 'invalid_json');
 
-        raw.hfssExePath = configuredHfssPath;
+    let reason = 'updated';
+    if (missingBoth) reason = 'config_missing';
+    else if (!updated && allAlreadySynced) reason = 'already_synced';
+    else if (hasWriteError && !updated) reason = 'write_error';
+    else if (!updated) reason = 'partial_no_update';
 
-        // Keep only top-level key in EP_Config for HFSS path to avoid duplicate fields.
-        if (raw.hfss && typeof raw.hfss === 'object' && 'exe_path' in raw.hfss) {
-            delete raw.hfss.exe_path;
-            if (Object.keys(raw.hfss).length === 0) {
-                delete raw.hfss;
-            }
-        }
-
-        fs.writeFileSync(epConfigPath, JSON.stringify(raw, null, 2), 'utf8');
-        return {
-            updated: true,
-            reason: 'updated',
-            epConfigPath,
+    if (hasWriteError) {
+        const failed = targets.filter((item) => item.reason === 'write_error' || item.reason === 'invalid_json');
+        logger.warn('[HFSS Sync] Failed to sync some config files', {
             configuredHfssPath,
-            previousHfssPath: currentHfssPath,
-        };
-    } catch (error) {
-        logger.warn('[HFSS Sync] Failed to sync EP_Config.json', { epConfigPath, error: error.message });
-        return { updated: false, reason: 'write_error', epConfigPath, configuredHfssPath };
+            failed,
+        });
     }
+
+    return {
+        updated,
+        reason,
+        configuredHfssPath,
+        epConfigPath,
+        verificationConfigPath,
+        targets,
+    };
 }
 
 module.exports = {

@@ -11,6 +11,28 @@ const defaultUserConfigPath = path.join(
   'Antenna Optimizer',
   'setup_variable.json'
 );
+
+const resolveElectronUserDataPath = () => {
+  const rawPath = String(process.env.ELECTRON_USER_DATA_PATH || '').trim();
+  if (!rawPath) return null;
+  return path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath);
+};
+
+const electronUserDataPath = resolveElectronUserDataPath();
+if (electronUserDataPath) {
+  try {
+    fs.mkdirSync(electronUserDataPath, { recursive: true });
+    app.setPath('userData', electronUserDataPath);
+  } catch (error) {
+    console.error(`[electron] Failed to set userData path (${electronUserDataPath}):`, error.message);
+  }
+}
+
+if (process.env.ELECTRON_DISABLE_GPU_CACHE === '1') {
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+  app.commandLine.appendSwitch('disable-gpu-program-cache');
+}
+
 process.env.SETUP_CONFIG_PATH = process.env.SETUP_CONFIG_PATH || defaultUserConfigPath;
 
 const setupConfig = require('../OPEN_THIS/SETUP/setup_loader');

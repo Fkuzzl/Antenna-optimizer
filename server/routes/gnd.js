@@ -11,6 +11,7 @@ const { spawn } = require('child_process');
 const { createResponse, sanitizeError } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
 const logger = require('../config/logger');
+const { saveProfileContext } = require('../services/moeaProfileManager');
 
 // Configure multer for GND file uploads
 const gndStorage = multer.diskStorage({
@@ -145,6 +146,22 @@ router.post('/upload', gndUpload.single('gndFile'), async (req, res) => {
             vertices: parseResult.vertex_count,
             faces: parseResult.face_count,
             edges: parseResult.edge_count
+        });
+
+        saveProfileContext(projectPath, {
+            gndSetting: {
+                mode: 'dxf',
+                useDXF: true,
+                filePath: file.path,
+                originalName: file.originalname,
+                bounds: parseResult.bounds || null,
+                validation: parseResult.validation || null
+            }
+        }).catch((contextError) => {
+            logger.warn('[MOEAProfile] Failed to persist DXF ground plane context', {
+                error: contextError.message,
+                projectPath
+            });
         });
         
         res.json({

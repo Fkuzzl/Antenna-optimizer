@@ -4,10 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AntennaVariableSelector from './AntennaVariableSelector';
 import SimulationResultsViewer from './SimulationResultsViewer';
+import MoeaProfileViewer from './MoeaProfileViewer';
 import AppConfig, { validateConfig, PathUtils, showAlert } from './app_config';
 
-export default function MatlabProjectRunner({ onBack, initialProjectPath = '', autoStart = false }) {
+export default function MatlabProjectRunner({ onBack, initialProjectPath = '', initialProfileName = '', autoStart = false, initialOpenMoeaProfiles = false, initialVerificationContext = null }) {
   const [filePath, setFilePath] = useState(initialProjectPath);
+  const [moeaProfileName, setMoeaProfileName] = useState(initialProfileName || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isTerminating, setIsTerminating] = useState(false);
   const [isStopButtonDisabled, setIsStopButtonDisabled] = useState(false);
@@ -25,6 +27,7 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
   const [showQuickGuide, setShowQuickGuide] = useState(false);
   const [showVariableSelector, setShowVariableSelector] = useState(false);
   const [showSimulationResults, setShowSimulationResults] = useState(false);
+  const [showMoeaProfiles, setShowMoeaProfiles] = useState(initialOpenMoeaProfiles);
   
   // Loading panel state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -55,6 +58,12 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
       setLocationValidationMessage('Project location loaded from tuning results');
     }
   }, [initialProjectPath]);
+
+  useEffect(() => {
+    if (initialProfileName && String(initialProfileName).trim()) {
+      setMoeaProfileName(String(initialProfileName).trim());
+    }
+  }, [initialProfileName]);
 
   // WebSocket connection state
   const [wsConnected, setWsConnected] = useState(false);
@@ -559,110 +568,10 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
     }
   };
 
-  // Handle optimization folder management
-  const handleOptimizationManagement = async (action) => {
-    try {
-      setIsLoading(true);
-      
-      const response = await fetch(`${MATLAB_SERVER_URL}/api/matlab/manage-optimization-folder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectPath: filePath,
-          action: action // 'backup-only' or 'backup-and-remove'
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        const actionText = action === 'backup-only' ? 'backed up' : 'backed up and removed';
-        const statsText = result.optimizationExists && result.stats && result.stats.optimization
-          ? `\n\nStatistics:\n- Files: ${result.stats.optimization.fileCount || 0}\n- Size: ${((result.stats.optimization.totalSize || 0) / 1024 / 1024).toFixed(2)} MB`
-          : '';
-        const backupText = result.paths && result.paths.backupPath 
-          ? `\n- Backup location: ${result.paths.backupPath}`
-          : '';
-        const fModelText = result.fModelBackupCreated 
-          ? `\n- F_Model_Element: Backed up`
-          : '';
-        const detailsText = result.optimizationExists 
-          ? `${statsText}${backupText}${fModelText}`
-          : '\n\nNo optimization folder was found.';
-        
-        showAlert(
-          'Complete',
-          `${result.message}${detailsText}`
-        );
-      } else {
-        showAlert('Error', result.message || 'Operation failed');
-      }
-    } catch (error) {
-      console.error('Error managing optimization folder:', error);
-      showAlert('Connection Error', 'Cannot connect to server');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Handle variable selection confirmation
   const handleVariableSelection = (selectedVariableIds) => {
     setShowVariableSelector(false);
     generateFModelElement(selectedVariableIds);
-  };
-
-  // Handle optimization management from AntennaVariableSelector
-  // Automatically backup and delete when toggle is enabled
-  const handleOptimizationManagementFromSelector = async () => {
-    try {
-      setIsLoading(true);
-      
-      const response = await fetch(`${MATLAB_SERVER_URL}/api/matlab/manage-optimization-folder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectPath: filePath,
-          action: 'backup-and-remove'
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Clear integrated Excel file when optimization folder is deleted
-        try {
-          const clearResponse = await fetch(`${MATLAB_SERVER_URL}/api/integrated-results/clear`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectPath: getProjectDirectory(filePath) })
-          });
-
-          const clearResult = await clearResponse.json();
-          if (clearResult.success) {
-            console.log('✅ Integrated Excel file cleared after optimization folder deletion');
-          } else {
-            console.log('⚠ï¸ Could not clear integrated Excel file:', clearResult.message);
-          }
-        } catch (clearError) {
-          console.error('Error clearing integrated Excel file:', clearError);
-        }
-
-        return { success: true, result }; // Return the detailed result
-      } else {
-        showAlert('Error', result.message || 'Operation failed');
-        return { success: false };
-      }
-    } catch (error) {
-      console.error('Error in optimization management:', error);
-      showAlert('Connection Error', 'Cannot connect to server');
-      return { success: false };
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Fetch current execution state from server (called on reconnect/refresh)
@@ -1058,6 +967,12 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
       return;
     }
 
+    const normalizedProfileName = String(moeaProfileName || '').trim();
+    if (!normalizedProfileName) {
+      showAlert('Profile Name Required', 'Please provide a MOEA profile name before launching.');
+      return;
+    }
+
     // IMMEDIATE STATE CHANGE - Set running state before API call for instant UI feedback
     const fileName = filePath.split(/[\\\/]/).pop();
     setExecutionState({
@@ -1088,7 +1003,8 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
         createFetchConfig({
           method: 'POST',
           body: JSON.stringify({
-            projectPath: filePath
+            projectPath: filePath,
+            profileName: normalizedProfileName,
           }),
         })
       );
@@ -1253,7 +1169,6 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
         onBack={() => setShowVariableSelector(false)}
         onConfirm={handleVariableSelection}
         projectPath={filePath}
-        onOptimizationManagement={handleOptimizationManagementFromSelector}
       />
     );
   }
@@ -1264,6 +1179,16 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
       <SimulationResultsViewer 
         onBack={() => setShowSimulationResults(false)}
         projectPath={filePath}
+      />
+    );
+  }
+
+  if (showMoeaProfiles) {
+    return (
+      <MoeaProfileViewer
+        onBack={() => setShowMoeaProfiles(false)}
+        projectPath={filePath}
+        initialVerificationContext={initialVerificationContext}
       />
     );
   }
@@ -1396,28 +1321,53 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
       {/* Results Button Section - Just below header */}
       {projectLocationConfirmed && (
         <View style={styles.headerResultsButtonSection}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (projectLocationConfirmed && filePath) {
-                setShowSimulationResults(true);
-              } else {
-                showAlert(
-                  'Project Location Required',
-                  'Please confirm your project location first to view simulation results from the correct directory.'
-                );
-              }
-            }} 
-            style={styles.headerResultsButton}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#0ea5e9', '#0284c7']}
-              style={styles.headerResultsButtonGradient}
+          <View style={styles.headerResultsButtonRow}>
+            <TouchableOpacity 
+              onPress={() => {
+                if (projectLocationConfirmed && filePath) {
+                  setShowSimulationResults(true);
+                } else {
+                  showAlert(
+                    'Project Location Required',
+                    'Please confirm your project location first to view simulation results from the correct directory.'
+                  );
+                }
+              }} 
+              style={styles.headerResultsButton}
+              activeOpacity={0.8}
             >
-              <Text style={styles.headerResultsButtonIcon}>📊</Text>
-              <Text style={styles.headerResultsButtonText}>View Simulation Results</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#0ea5e9', '#0284c7']}
+                style={styles.headerResultsButtonGradient}
+              >
+                <Text style={styles.headerResultsButtonIcon}>📊</Text>
+                <Text style={styles.headerResultsButtonText}>View Simulation Results</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => {
+                if (projectLocationConfirmed && filePath) {
+                  setShowMoeaProfiles(true);
+                } else {
+                  showAlert(
+                    'Project Location Required',
+                    'Please confirm your project location first to view MOEA profiles from the correct directory.'
+                  );
+                }
+              }} 
+              style={styles.headerResultsButton}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#2563eb', '#1d4ed8']}
+                style={styles.headerResultsButtonGradient}
+              >
+                <Text style={styles.headerResultsButtonIcon}>🗂️</Text>
+                <Text style={styles.headerResultsButtonText}>View MOEA Profiles</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -1595,6 +1545,20 @@ export default function MatlabProjectRunner({ onBack, initialProjectPath = '', a
                 numberOfLines={2}
                 editable={!executionState?.isRunning}
               />
+            )}
+
+            {projectLocationConfirmed && !executionState?.isRunning && (
+              <>
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>MOEA Profile Name</Text>
+                <TextInput
+                  style={styles.pathInput}
+                  value={moeaProfileName}
+                  onChangeText={setMoeaProfileName}
+                  placeholder="e.g. antenna1, project_alpha_runA"
+                  placeholderTextColor="#94a3b8"
+                  editable={!executionState?.isRunning}
+                />
+              </>
             )}
             
             {/* Show info message when MATLAB is running */}
@@ -1973,6 +1937,7 @@ const styles = StyleSheet.create({
   
   // Header Results Button
   headerResultsButtonSection: { backgroundColor: '#f8fafc', paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  headerResultsButtonRow: { gap: 10 },
   headerResultsButton: { borderRadius: 12, overflow: 'hidden', shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   headerResultsButtonGradient: { paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   headerResultsButtonIcon: { fontSize: 18, marginRight: 10 },

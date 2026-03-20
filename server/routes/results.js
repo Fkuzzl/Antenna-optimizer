@@ -10,6 +10,8 @@ const XLSX = require('xlsx');
 const { exec } = require('child_process');
 const { validateProjectPath, validatePaginationParams } = require('../middleware/validation');
 const { getPaginatedResults, readExcelWithRetry } = require('../services/excelReader');
+const { listMoeaProfiles, getMoeaProfile, deleteMoeaProfile } = require('../services/moeaProfileManager');
+const { startVerification, getVerificationStatus, getLatestVerificationForProfile, getVerificationChartPath, ALLOWED_CHARTS } = require('../services/moeaVerificationManager');
 const { createResponse, sanitizeError } = require('../utils/helpers');
 const { HTTP_STATUS, FILES } = require('../config/constants');
 const logger = require('../config/logger');
@@ -556,6 +558,240 @@ router.post('/results', async (req, res) => {
             error: error.message,
             timestamp: new Date().toISOString()
         });
+    }
+});
+
+/**
+ * GET /api/integrated-results/profiles?projectPath=...
+ * List saved MOEA profile snapshots from <project>/Result_Profile
+ */
+router.get('/profiles', async (req, res) => {
+    try {
+        const projectPath = resolveProjectDir(req.query.projectPath);
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        const profiles = await listMoeaProfiles(projectPath);
+        res.json(createResponse(true, {
+            count: profiles.length,
+            profiles,
+        }));
+    } catch (error) {
+        logger.error(`[MOEAProfile] Failed to list profiles: ${error.message}`);
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, 'Failed to list MOEA profiles', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * GET /api/integrated-results/profiles/:profileId?projectPath=...
+ * Get single MOEA profile snapshot details
+ */
+router.get('/profiles/:profileId', async (req, res) => {
+    try {
+        const projectPath = resolveProjectDir(req.query.projectPath);
+        const { profileId } = req.params;
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        if (!profileId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'profileId is required')
+            );
+        }
+
+        const profile = await getMoeaProfile(projectPath, profileId);
+        res.json(createResponse(true, { profile }));
+    } catch (error) {
+        logger.error(`[MOEAProfile] Failed to read profile: ${error.message}`);
+        const statusCode = String(error.message || '').includes('not found') ? HTTP_STATUS.NOT_FOUND : HTTP_STATUS.INTERNAL_ERROR;
+        res.status(statusCode).json(
+            createResponse(false, null, 'Failed to load MOEA profile', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * DELETE /api/integrated-results/profiles/:profileId?projectPath=...
+ * Delete one MOEA profile snapshot folder.
+ */
+router.delete('/profiles/:profileId', async (req, res) => {
+    try {
+        const projectPath = resolveProjectDir(req.query.projectPath);
+        const { profileId } = req.params;
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        if (!profileId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'profileId is required')
+            );
+        }
+
+        const deleted = await deleteMoeaProfile(projectPath, profileId);
+        res.json(createResponse(true, deleted, 'Profile deleted'));
+    } catch (error) {
+        logger.error(`[MOEAProfile] Failed to delete profile: ${error.message}`);
+        const message = String(error.message || '').toLowerCase();
+        const statusCode = message.includes('not found') ? HTTP_STATUS.NOT_FOUND : HTTP_STATUS.INTERNAL_ERROR;
+        res.status(statusCode).json(
+            createResponse(false, null, 'Failed to delete MOEA profile', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * POST /api/integrated-results/profiles/:profileId/verify
+ * Start full verification HFSS sweep for selected profile solution.
+ * Body: { projectPath: string, solutionType: 'balanced'|'optimal' }
+ */
+router.post('/profiles/:profileId/verify', async (req, res) => {
+    try {
+        const { profileId } = req.params;
+        const { projectPath: rawProjectPath, solutionType } = req.body || {};
+        const projectPath = resolveProjectDir(rawProjectPath);
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath is required')
+            );
+        }
+
+        if (!['balanced', 'optimal'].includes(solutionType)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'solutionType must be "balanced" or "optimal"')
+            );
+        }
+
+        const started = await startVerification({ projectPath, profileId, solutionType });
+        res.json(createResponse(true, started, 'Verification started'));
+    } catch (error) {
+        logger.error(`[MOEAVerification] Failed to start: ${error.message}`);
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, 'Failed to start verification', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * GET /api/integrated-results/profiles/:profileId/verify-status?projectPath=...&runId=...
+ * Poll verification status.
+ */
+router.get('/profiles/:profileId/verify-status', async (req, res) => {
+    try {
+        const { profileId } = req.params;
+        const { projectPath: rawProjectPath, runId } = req.query;
+        const projectPath = resolveProjectDir(rawProjectPath);
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        const status = await getVerificationStatus({ projectPath, profileId, runId });
+        if (!status) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json(
+                createResponse(false, null, 'Verification run not found')
+            );
+        }
+
+        res.json(createResponse(true, status));
+    } catch (error) {
+        logger.error(`[MOEAVerification] Status read failed: ${error.message}`);
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, 'Failed to read verification status', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * GET /api/integrated-results/profiles/:profileId/verify-latest?projectPath=...
+ * Resolve latest verification run for this profile (completed or in-progress).
+ */
+router.get('/profiles/:profileId/verify-latest', async (req, res) => {
+    try {
+        const { profileId } = req.params;
+        const { projectPath: rawProjectPath } = req.query;
+        const projectPath = resolveProjectDir(rawProjectPath);
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        const latest = await getLatestVerificationForProfile({ projectPath, profileId });
+        if (!latest) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json(
+                createResponse(false, null, 'No verification run found for this profile')
+            );
+        }
+
+        res.json(createResponse(true, latest));
+    } catch (error) {
+        logger.error(`[MOEAVerification] Latest run lookup failed: ${error.message}`);
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, 'Failed to read latest verification run', sanitizeError(error))
+        );
+    }
+});
+
+/**
+ * GET /api/integrated-results/profiles/:profileId/verify-chart/:chartName?projectPath=...&runId=...
+ * Serve generated verification charts.
+ */
+router.get('/profiles/:profileId/verify-chart/:chartName', async (req, res) => {
+    try {
+        const { profileId, chartName } = req.params;
+        const { runId, projectPath: rawProjectPath } = req.query;
+        const projectPath = resolveProjectDir(rawProjectPath);
+
+        if (!projectPath) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'projectPath query parameter is required')
+            );
+        }
+
+        if (!runId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'runId query parameter is required')
+            );
+        }
+
+        if (!ALLOWED_CHARTS.includes(chartName)) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json(
+                createResponse(false, null, 'Invalid chart name')
+            );
+        }
+
+        const chartPath = getVerificationChartPath({ projectPath, profileId, runId, chartName });
+        if (!fs.existsSync(chartPath)) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json(
+                createResponse(false, null, `Chart file not found: ${chartName}`)
+            );
+        }
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'no-cache');
+        fs.createReadStream(chartPath).pipe(res);
+    } catch (error) {
+        logger.error(`[MOEAVerification] Chart serve failed: ${error.message}`);
+        res.status(HTTP_STATUS.INTERNAL_ERROR).json(
+            createResponse(false, null, 'Failed to serve verification chart', sanitizeError(error))
+        );
     }
 });
 

@@ -10,6 +10,63 @@ const logger = require('../config/logger');
 
 const BALANCED_OPTIMAL_MAX_AR_DB = 1;
 
+const getInterpolatedPercentageBelowThreshold = (frequencies = [], values = [], threshold = 3) => {
+    const points = [];
+
+    const count = Math.min(frequencies.length, values.length);
+    for (let i = 0; i < count; i++) {
+        const frequency = Number(frequencies[i]);
+        const value = Number(values[i]);
+        if (Number.isNaN(frequency) || Number.isNaN(value)) continue;
+        points.push({ frequency, value });
+    }
+
+    if (points.length < 2) return null;
+
+    points.sort((left, right) => left.frequency - right.frequency);
+
+    let totalSpan = 0;
+    let belowSpan = 0;
+
+    for (let index = 0; index < points.length - 1; index++) {
+        const p1 = points[index];
+        const p2 = points[index + 1];
+
+        const segmentLength = p2.frequency - p1.frequency;
+        if (!(segmentLength > 0)) continue;
+
+        totalSpan += segmentLength;
+
+        const y1 = p1.value;
+        const y2 = p2.value;
+
+        if (y1 < threshold && y2 < threshold) {
+            belowSpan += segmentLength;
+            continue;
+        }
+
+        if (y1 >= threshold && y2 >= threshold) {
+            continue;
+        }
+
+        if (y1 === y2) {
+            continue;
+        }
+
+        const ratio = (threshold - y1) / (y2 - y1);
+        const crossingFrequency = p1.frequency + (ratio * segmentLength);
+
+        if (y1 < threshold) {
+            belowSpan += Math.max(0, crossingFrequency - p1.frequency);
+        } else {
+            belowSpan += Math.max(0, p2.frequency - crossingFrequency);
+        }
+    }
+
+    if (!(totalSpan > 0)) return null;
+    return (belowSpan / totalSpan) * 100;
+};
+
 /**
  * Reads Excel file with retry logic for handling file corruption or locks
  * @param {string} filePath - Path to Excel file
@@ -132,6 +189,11 @@ const computeBalancedOptimal = (allIterations, targetFrequency = 1.575) => {
             const s11 = getObjectiveValue(iteration, 's11', targetFrequency, 'min');
             const ar = getObjectiveValue(iteration, 'ar', targetFrequency, 'min');
             const gain = getObjectiveValue(iteration, 'gain', targetFrequency, 'max');
+            const arBandwidthPctBelow3dB = getInterpolatedPercentageBelowThreshold(
+                iteration?.frequencies,
+                iteration?.ar,
+                3
+            );
 
             if (s11 == null || ar == null || gain == null) {
                 return null;
@@ -146,6 +208,7 @@ const computeBalancedOptimal = (allIterations, targetFrequency = 1.575) => {
                 s11,
                 ar,
                 gain,
+                arBandwidthPctBelow3dB,
             };
         })
         .filter(Boolean);
@@ -203,6 +266,12 @@ const computeBalancedOptimal = (allIterations, targetFrequency = 1.575) => {
             ar: bestCandidate.score.ar,
             gain: bestCandidate.score.gain,
             balanced: bestCandidate.score.balanced,
+        },
+        arBandwidthPctBelow3dB: bestCandidate.arBandwidthPctBelow3dB,
+        arBandwidthMeta: {
+            thresholdDb: 3,
+            method: 'linear-interpolation',
+            predicted: true,
         },
         objectiveDirection: {
             s11: 'min',

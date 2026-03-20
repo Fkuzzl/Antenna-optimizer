@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Image, Platform, TextInput, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MatlabProjectRunner from './MatlabProjectRunner';
@@ -25,6 +25,8 @@ const HomePage = () => {
   // Progressive tuning state
   const [tuningProjectPath, setTuningProjectPath] = useState('');
   const [tuningResultsData, setTuningResultsData] = useState(null);
+  const [moeaProfileNameFromTuning, setMoeaProfileNameFromTuning] = useState('');
+  const [restoredVerificationContext, setRestoredVerificationContext] = useState(null);
   const [checkingTuningStatus, setCheckingTuningStatus] = useState(false);
   const [checkingMatlabStatus, setCheckingMatlabStatus] = useState(false);
 
@@ -177,11 +179,65 @@ const HomePage = () => {
       if (!data.success) throw new Error(data.message || 'Server error');
       // Update the stored project path in case it was resolved server-side
       if (data.projectPath) setTuningProjectPath(data.projectPath);
+      const progressiveName =
+        results?.antenna_name ||
+        results?.manager?.antennaName ||
+        results?.manager?.antenna_name ||
+        results?.run_name ||
+        'antenna1';
+      setMoeaProfileNameFromTuning(progressiveName);
       setCurrentPage('matlabFromTuning');
     } catch (err) {
       modalAlert('Setup Failed', `Could not apply tightened ranges:\n${err.message}`);
     }
   }, [tuningProjectPath, modalAlert]);
+
+  const restoreRuntimePage = useCallback(async () => {
+    try {
+      const response = await fetch(`${AppConfig.serverUrl}/api/matlab/runtime-state`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+      if (!data?.success) return;
+
+      const stage = data.stage;
+      const context = data.context || {};
+
+      if (stage === 'progressive_tuning_running') {
+        if (context.projectPath) setTuningProjectPath(context.projectPath);
+        setCurrentPage('progressiveTuningProgress');
+        return;
+      }
+
+      if (stage === 'moea_tuning_running') {
+        if (context.projectPath) setTuningProjectPath(context.projectPath);
+        setRestoredVerificationContext(null);
+        setCurrentPage('matlab');
+        return;
+      }
+
+      if (stage === 'final_simulation_running' || stage === 'final_simulation_finished') {
+        if (context.projectDir) setTuningProjectPath(context.projectDir);
+        setRestoredVerificationContext({
+          profileId: context.profileId || null,
+          runId: context.runId || null,
+          solutionType: context.solutionType || null,
+          status: context.status || null,
+          message: context.message || null,
+          summary: context.summary || null,
+          resultLocations: context.resultLocations || null,
+        });
+        setCurrentPage('matlabFinalSimulation');
+      }
+    } catch {
+    }
+  }, []);
+
+  useEffect(() => {
+    restoreRuntimePage();
+  }, [restoreRuntimePage]);
 
   // Navigation functions
   const navigateHome = () => {
@@ -190,11 +246,29 @@ const HomePage = () => {
 
   // Render different pages based on current selection
   if (currentPage === 'matlab') {
-    return <MatlabProjectRunner onBack={navigateHome} />;
+    return <MatlabProjectRunner onBack={navigateHome} initialProjectPath={tuningProjectPath} />;
+  }
+
+  if (currentPage === 'matlabFinalSimulation') {
+    return (
+      <MatlabProjectRunner
+        onBack={navigateHome}
+        initialProjectPath={tuningProjectPath}
+        initialOpenMoeaProfiles={true}
+        initialVerificationContext={restoredVerificationContext}
+      />
+    );
   }
 
   if (currentPage === 'matlabFromTuning') {
-    return <MatlabProjectRunner onBack={navigateHome} initialProjectPath={tuningProjectPath} autoStart={true} />;
+    return (
+      <MatlabProjectRunner
+        onBack={navigateHome}
+        initialProjectPath={tuningProjectPath}
+        initialProfileName={moeaProfileNameFromTuning}
+        autoStart={true}
+      />
+    );
   }
 
   if (currentPage === 'settings') {
@@ -222,6 +296,7 @@ const HomePage = () => {
       <ProgressiveTuningProgress
         onBack={navigateHome}
         projectPath={tuningProjectPath}
+        onStopped={() => setCurrentPage('progressiveTuningSetup')}
         onComplete={(data) => {
           setTuningResultsData(data);
           setCurrentPage('progressiveTuningResults');

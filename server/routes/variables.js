@@ -9,6 +9,7 @@ const path = require('path');
 const { createResponse, sanitizeError } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
 const logger = require('../config/logger');
+const { saveProfileContext } = require('../services/moeaProfileManager');
 
 /**
  * GET /api/variables
@@ -147,6 +148,19 @@ router.post('/apply', async (req, res) => {
             if (stderr) {
                 logger.warn('Python script stderr', { stderr });
             }
+
+            saveProfileContext(projectRoot, {
+                variableSetting: {
+                    variableIds,
+                    variableCount: variableIds.length,
+                    seedRange: `1-${variableIds.length}`
+                }
+            }).catch((contextError) => {
+                logger.warn('[MOEAProfile] Failed to persist variable setting context', {
+                    error: contextError.message,
+                    projectRoot
+                });
+            });
             
             res.json({
                 success: true,

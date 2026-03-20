@@ -69,6 +69,7 @@ npm-debug.log*
 yarn-debug.log*
 server/server.pid
 electron-dist/
+.electron-dev-profile/
 
 # IDE
 .vscode/

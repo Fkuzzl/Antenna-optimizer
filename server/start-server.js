@@ -85,10 +85,16 @@ function killExistingProcesses() {
 function startServer() {
     return new Promise((resolve, reject) => {
         console.log('🚀 Starting MATLAB server...');
+        const forcedPort = String(serverConfig.port);
         
         const serverProcess = spawn('node', [SERVER_SCRIPT], {
             detached: false,
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: {
+                ...process.env,
+                PORT: forcedPort,
+                SERVER_PORT: forcedPort,
+            }
         });
         
         // Write PID to file

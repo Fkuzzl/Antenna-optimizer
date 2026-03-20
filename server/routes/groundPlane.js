@@ -12,6 +12,7 @@ const { exec } = require('child_process');
 const { createResponse, validatePath, sanitizeError } = require('../utils/helpers');
 const { HTTP_STATUS } = require('../config/constants');
 const logger = require('../config/logger');
+const { saveProfileContext } = require('../services/moeaProfileManager');
 
 /**
  * POST /api/matlab/update-ground-plane
@@ -248,6 +249,26 @@ hfssChangeVar(fid,'GND_yPos',GND_yPos,'mm');
             await fsPromises.writeFile(fModelPath, fModelContent, 'utf-8');
             logger.info('Successfully updated F_Model_Element.m');
 
+            saveProfileContext(projectRoot, {
+                gndSetting: {
+                    mode: 'parametric',
+                    Lgx: lgxValue,
+                    Lgy: lgyValue,
+                    GND_xPos: xPosValue,
+                    GND_yPos: yPosValue,
+                    groundPlaneThick: groundPlaneThick !== undefined ? Number(groundPlaneThick) : null
+                },
+                antennaPosition: {
+                    x: xPosValue,
+                    y: yPosValue
+                }
+            }).catch((contextError) => {
+                logger.warn('[MOEAProfile] Failed to persist ground plane context', {
+                    error: contextError.message,
+                    projectRoot
+                });
+            });
+
             res.json({
                 success: true,
                 message: 'Ground plane parameters updated successfully in F_Model_Element.m',
@@ -353,6 +374,22 @@ router.post('/generate-gnd-import', async (req, res) => {
 
                 const outputPath = path.join(projectRoot, 'Function', 'HFSS', 'F_GND_Import.m');
 
+                saveProfileContext(projectRoot, {
+                    gndSetting: {
+                        mode: 'parametric',
+                        useDXF: false,
+                        filePath: null,
+                        originalName: null,
+                        bounds: null,
+                        validation: null
+                    }
+                }).catch((contextError) => {
+                    logger.warn('[MOEAProfile] Failed to persist cleared ground plane context', {
+                        error: contextError.message,
+                        projectRoot
+                    });
+                });
+
                 res.json({
                     success: true,
                     message: 'F_GND_Import.m cleared (no custom GND)',
@@ -419,6 +456,24 @@ router.post('/generate-gnd-import', async (req, res) => {
 
                 // Expected output path
                 const outputPath = path.join(projectRoot, 'Function', 'HFSS', 'F_GND_Import.m');
+
+                saveProfileContext(projectRoot, {
+                    gndSetting: {
+                        mode: 'dxf',
+                        useDXF: true,
+                        filePath: dxfPath,
+                        originalName: path.basename(dxfPath)
+                    },
+                    antennaPosition: {
+                        x: Number(gndXPos),
+                        y: Number(gndYPos)
+                    }
+                }).catch((contextError) => {
+                    logger.warn('[MOEAProfile] Failed to persist custom DXF ground plane context', {
+                        error: contextError.message,
+                        projectRoot
+                    });
+                });
 
                 res.json({
                     success: true,

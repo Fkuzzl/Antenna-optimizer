@@ -737,6 +737,10 @@ export default function ProgressiveTuningSetup({ onBack, projectPath, onSetProje
       const GND_config = {
         use_DXF: gndMode === 'dxf',
         ...(gndMode === 'dxf' && { dxf_file_path: dxfPath.trim() }),
+        ...(gndMode === 'dxf' && dxfGndData?.bounds && {
+          dxf_min_x: Number(dxfGndData.bounds.min_x) || 0,
+          dxf_min_y: Number(dxfGndData.bounds.min_y) || 0,
+        }),
         Lgx: parseFloat(lgx),
         Lgy: lgyNum,
         xPos: parseFloat((lgyNum - antennaY).toFixed(2)),

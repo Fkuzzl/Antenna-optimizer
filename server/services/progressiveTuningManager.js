@@ -31,6 +31,8 @@ const DEFAULT_TUNING_VARIABLES = {
     bluel:  { value: 10.54, unit: 'mm',  min: 10.39, max: 10.60, description: 'Blue-L patch length' },
 };
 
+const TERMINAL_STATUSES = new Set(['completed', 'error', 'cancelled', 'stopped', 'invalid', 'invalid_initial']);
+
 // Phase definitions
 const PHASES = [
     { id: 1, name: 'Resonant Frequency',    target: '1.575 GHz',   variables: ['brown', 'ngreen', 'bluel'], estimatedSims: '5-8' },
@@ -55,6 +57,7 @@ class ProgressiveTuningManager {
             launcherExited: false,   // True when the matlab launcher process exits (normal on Windows)
             matlabAlive: false,      // True when actual MATLAB.exe is detected running
             lastMatlabCheck: null,   // Timestamp of last MATLAB process check
+            lastErrorOutput: '',     // Last stderr text captured from MATLAB
         };
         
         this._statusPollInterval = null;
@@ -177,6 +180,50 @@ class ProgressiveTuningManager {
     _resolveResultsDir(projectPath, antennaName) {
         const folderName = antennaName || `run_${Date.now()}`;
         return path.join(this._resolveEarlyPhaseDir(projectPath), 'Results', folderName);
+    }
+
+    _classifyErrorText(text) {
+        const raw = String(text || '').toLowerCase();
+        if (!raw) return null;
+
+        const hfssLicensePatterns = [
+            /hfss[^\n]{0,80}license/,
+            /license[^\n]{0,80}hfss/,
+            /ansys[^\n]{0,80}license/,
+            /license checkout failed/,
+            /all licenses? (are )?in use/,
+            /no licenses? available/,
+            /failed to check out license/,
+        ];
+
+        if (hfssLicensePatterns.some((p) => p.test(raw))) {
+            return 'hfss_license';
+        }
+
+        return null;
+    }
+
+    _withErrorClassification(status) {
+        if (!status || typeof status !== 'object') return status;
+
+        const statusName = status.status;
+        if (statusName === 'invalid' || statusName === 'invalid_initial') {
+            return { ...status, error_type: 'invalid' };
+        }
+
+        if (statusName === 'error') {
+            const inferred = this._classifyErrorText(
+                [
+                    status.status_message,
+                    status.phase_step,
+                    status.error,
+                    this.state.lastErrorOutput,
+                ].filter(Boolean).join(' | ')
+            ) || 'matlab_crash';
+            return { ...status, error_type: status.error_type || inferred };
+        }
+
+        return status;
     }
 
     /**
@@ -326,6 +373,36 @@ class ProgressiveTuningManager {
             throw new Error(`Project path does not exist: ${projectPath}`);
         }
 
+        // In create mode, do not overwrite an existing run folder/profile with the same antenna name.
+        if (!isResume) {
+            const existingRunDir = this._resolveResultsDir(projectPath, effectiveName);
+            const existingProfilePath = path.join(existingRunDir, 'profile.json');
+
+            // If only an empty leftover folder exists (e.g. after partial delete), remove it and allow reuse.
+            if (fs.existsSync(existingRunDir) && !fs.existsSync(existingProfilePath)) {
+                try {
+                    const entries = await fsPromises.readdir(existingRunDir);
+                    if (entries.length === 0) {
+                        await fsPromises.rmdir(existingRunDir);
+                        logger.info('[ProgressiveTuning] Removed empty leftover run folder before start', {
+                            runDir: existingRunDir,
+                        });
+                    }
+                } catch (cleanupErr) {
+                    logger.warn('[ProgressiveTuning] Could not clean leftover run folder', {
+                        runDir: existingRunDir,
+                        error: cleanupErr.message,
+                    });
+                }
+            }
+
+            if (fs.existsSync(existingRunDir) || fs.existsSync(existingProfilePath)) {
+                throw new Error(
+                    `Run "${effectiveName}" already exists. Choose a new antenna name or use resume mode.`
+                );
+            }
+        }
+
         const earlyPhaseDir = this._resolveEarlyPhaseDir(projectPath);
 
         // Create EARLY_PHASE directory structure if needed
@@ -414,6 +491,8 @@ class ProgressiveTuningManager {
                 if (gndConfig.yPos !== undefined) nvPairs.push(`'yPos', ${gndConfig.yPos}`);
                 if (gndConfig.Lgx !== undefined) nvPairs.push(`'Lgx', ${gndConfig.Lgx}`);
                 if (gndConfig.Lgy !== undefined) nvPairs.push(`'Lgy', ${gndConfig.Lgy}`);
+                if (gndConfig.dxf_min_x !== undefined) nvPairs.push(`'dxf_min_x', ${gndConfig.dxf_min_x}`);
+                if (gndConfig.dxf_min_y !== undefined) nvPairs.push(`'dxf_min_y', ${gndConfig.dxf_min_y}`);
             } else {
                 nvPairs.push(`'Lgx', ${gndConfig.Lgx}`);
                 nvPairs.push(`'Lgy', ${gndConfig.Lgy}`);
@@ -457,7 +536,9 @@ class ProgressiveTuningManager {
         });
 
         matlabProcess.stderr?.on('data', (data) => {
-            logger.warn(`[ProgressiveTuning] MATLAB stderr: ${data.toString().trim()}`);
+            const text = data.toString();
+            this.state.lastErrorOutput = `${this.state.lastErrorOutput || ''}\n${text}`.slice(-4000);
+            logger.warn(`[ProgressiveTuning] MATLAB stderr: ${text.trim()}`);
         });
 
         matlabProcess.on('close', (code) => {
@@ -492,6 +573,7 @@ class ProgressiveTuningManager {
             matlabAlive: true,
             lastMatlabCheck: new Date(),
             isResume,
+            lastErrorOutput: '',
         };
 
         // Start background polling of status.json to keep cached state fresh
@@ -540,11 +622,11 @@ class ProgressiveTuningManager {
                 if (fs.existsSync(statusPath)) {
                     const raw = await fsPromises.readFile(statusPath, 'utf8');
                     const parsed = JSON.parse(raw);
-                    this.state.cachedStatus = parsed;
+                    this.state.cachedStatus = this._withErrorClassification(parsed);
                     this.state.lastStatusUpdate = new Date();
 
                     // Auto-detect completion or error from status.json
-                    if (parsed.status === 'completed' || parsed.status === 'error' || parsed.status === 'cancelled' || parsed.status === 'stopped') {
+                    if (TERMINAL_STATUSES.has(parsed.status)) {
                         this.state.status = parsed.status === 'stopped' ? 'cancelled' : parsed.status;
                         this.state.matlabAlive = false;
                         this._stopStatusPolling();
@@ -578,6 +660,7 @@ class ProgressiveTuningManager {
                             ...this.state.cachedStatus,
                             status: 'error',
                             status_message: 'MATLAB process terminated without starting tuning. Check MATLAB console for errors.',
+                            error_type: this._classifyErrorText(this.state.lastErrorOutput) || 'matlab_crash',
                             elapsed_seconds: elapsedSec,
                         };
                         this._stopStatusPolling();
@@ -585,15 +668,16 @@ class ProgressiveTuningManager {
                     }
 
                     // If status progressed but MATLAB is now gone without completing
-                    if (statusFromFile && statusFromFile !== 'starting' && statusFromFile !== 'resuming' &&
-                        statusFromFile !== 'completed' && statusFromFile !== 'error' && 
-                        statusFromFile !== 'cancelled' && statusFromFile !== 'stopped') {
+                    if (statusFromFile && statusFromFile !== 'starting' && statusFromFile !== 'resuming' && !TERMINAL_STATUSES.has(statusFromFile)) {
                         logger.warn(`[ProgressiveTuning] MATLAB exited while status was '${statusFromFile}' — marking as error`);
                         this.state.status = 'error';
                         this.state.cachedStatus = {
                             ...this.state.cachedStatus,
                             status: 'error',
                             status_message: `MATLAB process exited unexpectedly during ${statusFromFile}. Check MATLAB console.`,
+                            error_type: this._classifyErrorText(
+                                [this.state.cachedStatus?.status_message, this.state.cachedStatus?.phase_step, this.state.lastErrorOutput].filter(Boolean).join(' | ')
+                            ) || 'matlab_crash',
                             elapsed_seconds: elapsedSec,
                         };
                         this._stopStatusPolling();
@@ -638,14 +722,15 @@ class ProgressiveTuningManager {
             if (fs.existsSync(statusPath)) {
                 const raw = await fsPromises.readFile(statusPath, 'utf8');
                 const parsed = JSON.parse(raw);
-                this.state.cachedStatus = parsed;
+                const normalized = this._withErrorClassification(parsed);
+                this.state.cachedStatus = normalized;
                 
                 // Calculate elapsed time if MATLAB doesn't provide it
-                if (this.state.startTime && !parsed.elapsed_seconds) {
-                    parsed.elapsed_seconds = Math.floor((Date.now() - this.state.startTime.getTime()) / 1000);
+                if (this.state.startTime && !normalized.elapsed_seconds) {
+                    normalized.elapsed_seconds = Math.floor((Date.now() - this.state.startTime.getTime()) / 1000);
                 }
                 
-                return parsed;
+                return normalized;
             }
         } catch (err) {
             logger.debug('[ProgressiveTuning] Error reading status.json, using cache', { error: err.message });
@@ -653,7 +738,7 @@ class ProgressiveTuningManager {
 
         // Fallback to cached status
         if (this.state.cachedStatus) {
-            return this.state.cachedStatus;
+            return this._withErrorClassification(this.state.cachedStatus);
         }
 
         // No status available yet
@@ -809,6 +894,7 @@ class ProgressiveTuningManager {
             matlabAlive: false,
             lastMatlabCheck: null,
             isResume: false,
+            lastErrorOutput: '',
         };
         logger.info('[ProgressiveTuning] Manager reset');
     }

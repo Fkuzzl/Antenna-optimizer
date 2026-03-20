@@ -312,6 +312,7 @@ router.get('/runs', async (req, res) => {
             logger.info('[ProgressiveTuning] Synced HFSS path on project location confirmation', {
                 projectPath,
                 epConfigPath: hfssSync.epConfigPath,
+                verificationConfigPath: hfssSync.verificationConfigPath,
             });
         }
 
@@ -502,7 +503,43 @@ router.delete('/run', async (req, res) => {
         if (!fs.existsSync(normalised)) {
             return res.status(404).json(createResponse(false, null, 'Run directory not found'));
         }
-        fs.rmSync(normalised, { recursive: true, force: true });
+
+        // Robust deletion for Windows: retry a few times and verify folder removal.
+        await fs.promises.rm(normalised, {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 200,
+        });
+
+        // Extra cleanup pass in case of transient file locks creating a half-deleted folder.
+        if (fs.existsSync(normalised)) {
+            try {
+                const leftovers = await fs.promises.readdir(normalised);
+                for (const name of leftovers) {
+                    const itemPath = path.join(normalised, name);
+                    await fs.promises.rm(itemPath, {
+                        recursive: true,
+                        force: true,
+                        maxRetries: 5,
+                        retryDelay: 200,
+                    });
+                }
+                await fs.promises.rmdir(normalised);
+            } catch (cleanupErr) {
+                logger.warn('[ProgressiveTuning] Secondary delete cleanup failed', {
+                    runPath: normalised,
+                    error: cleanupErr.message,
+                });
+            }
+        }
+
+        if (fs.existsSync(normalised)) {
+            return res.status(HTTP_STATUS.CONFLICT).json(
+                createResponse(false, null, 'Run files were removed but the run folder is still present. Close MATLAB/HFSS locks and delete again.')
+            );
+        }
+
         logger.info('[ProgressiveTuning] Run deleted', { runPath: normalised });
         res.json(createResponse(true, null, 'Run deleted successfully'));
     } catch (error) {

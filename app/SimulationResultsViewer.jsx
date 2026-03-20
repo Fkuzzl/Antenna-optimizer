@@ -342,6 +342,14 @@ export default function SimulationResultsViewer({ onBack, projectPath = null }) 
               <Text style={styles.parameterValue}>{formatResult(simulationResults.summary.balancedOptimal.objectives.gain)} dBi</Text>
             </View>
             <View style={styles.parameterRow}>
+              <Text style={styles.parameterLabel}>AR Bandwidth (&lt;3 dB, predicted):</Text>
+              <Text style={styles.parameterValue}>
+                {simulationResults.summary.balancedOptimal.arBandwidthPctBelow3dB == null
+                  ? 'N/A'
+                  : `${simulationResults.summary.balancedOptimal.arBandwidthPctBelow3dB.toFixed(2)}%`}
+              </Text>
+            </View>
+            <View style={styles.parameterRow}>
               <Text style={styles.parameterLabel}>Balanced Score:</Text>
               <Text style={[styles.parameterValue, { color: '#059669' }]}> 
                 {simulationResults.summary.balancedOptimal.normalizedScore.balanced.toFixed(4)}

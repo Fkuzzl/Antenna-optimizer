@@ -164,7 +164,7 @@ const getVSWRColor = (vswr) => {
   return '#ef4444';
 };
 
-export default function ProgressiveTuningProgress({ onBack, onComplete, projectPath }) {
+export default function ProgressiveTuningProgress({ onBack, onComplete, onStopped, projectPath }) {
   const [status, setStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -174,6 +174,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
   const [showFixedVars, setShowFixedVars] = useState({});
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustValues, setAdjustValues] = useState({});
+  const [adjustTrackWidths, setAdjustTrackWidths] = useState({});
   const [isRetrying, setIsRetrying] = useState(false);
   const pollRef = useRef(null);
   const autoNavTimerRef = useRef(null); // tracks the auto-navigate timer for cleanup
@@ -194,7 +195,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
         setIsLoading(false);
 
         // Check for final states
-        const finalStatuses = ['completed', 'error', 'cancelled', 'stopped', 'invalid_initial'];
+        const finalStatuses = ['completed', 'error', 'cancelled', 'stopped', 'invalid', 'invalid_initial'];
         if (finalStatuses.includes(data.data.status) || finalStatuses.includes(data.data.manager?.status)) {
           // Stop polling
           if (pollRef.current) {
@@ -202,9 +203,8 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
             pollRef.current = null;
           }
           // Auto-navigate to results after letting user see the final state
-          // 'cancelled' and 'stopped' also navigate to results to show partial data
           if (data.data.status === 'completed' || data.data.status === 'error' ||
-              data.data.status === 'cancelled' || data.data.status === 'stopped') {
+              data.data.status === 'cancelled') {
             autoNavTimerRef.current = setTimeout(() => {
               if (onComplete) onComplete(data.data);
             }, 5000);
@@ -240,6 +240,21 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
    * The server detects that Progressive Tuning is active and writes
    * control.json — MATLAB will save a checkpoint and exit on its own.
    */
+  const confirmProcessesStopped = async () => {
+    try {
+      const statusResponse = await fetch(`${SERVER_URL}/api/matlab/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const statusData = await statusResponse.json();
+      const matlabCount = statusData?.processDetails?.matlab?.count ?? 0;
+      const hfssCount = statusData?.processDetails?.hfss?.count ?? 0;
+      return matlabCount === 0 && hfssCount === 0;
+    } catch {
+      return false;
+    }
+  };
+
   const handleStop = async () => {
     setIsStopping(true);
     try {
@@ -250,21 +265,25 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
       const controlData = await controlResponse.json();
 
       if (controlData.success) {
+        const remainingMatlab = controlData?.summary?.remainingMatlab ?? 0;
+        const remainingHfss = controlData?.summary?.remainingHfss ?? 0;
+        const stoppedByStopSummary = remainingMatlab === 0 && remainingHfss === 0;
+        const stoppedByLiveStatus = await confirmProcessesStopped();
+
+        if (stoppedByStopSummary && stoppedByLiveStatus) {
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          showAlert('Processes Stopped', 'MATLAB and HFSS are terminated. Returning to setup page.');
+          if (onStopped) onStopped();
+          return;
+        }
+
         showAlert(
-          'Stop Requested',
-          'MATLAB will save a checkpoint and exit gracefully.\nYou can resume this run later.'
+          'Stop Incomplete',
+          `Some processes may still be running (MATLAB: ${remainingMatlab}, HFSS: ${remainingHfss}). Please stop again or close them manually.`
         );
-
-        // Update local status to stopping
-        setStatus(prev => prev ? {
-          ...prev,
-          status: 'stopping',
-          status_message: 'Stopping... saving checkpoint',
-          manager: { ...prev.manager, status: 'stopping' },
-        } : prev);
-
-        // Don't stop polling — let it detect the final status from MATLAB
-        // Polling will auto-stop when status becomes 'completed', 'cancelled', or 'stopped'
       } else {
         showAlert('Stop Failed', controlData.message || 'Failed to send stop command');
       }
@@ -287,6 +306,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
       const savedGndConfig = status?.gnd_config || status?.manager?.gndConfig || null;
       const savedProjectPath = status?.manager?.projectPath || projectPath;
       const savedAntennaName = status?.antenna_name || 'antenna1';
+      const retryAntennaName = `${savedAntennaName}_retry_${Date.now()}`;
 
       // 1. Reset the manager state so it allows a new start
       await fetch(`${SERVER_URL}/api/progressive-tuning/reset`, { method: 'POST' });
@@ -310,10 +330,11 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
       }
 
       // Overlay the user's adjusted values
-      const initial_variables = { ...existingVars };
-      Object.entries(newValues).forEach(([k, data]) => {
-        initial_variables[k] = data.value;
-      });
+      const initial_variables = {
+        ...existingVars,
+        orange: newValues.orange?.value,
+        orange2: newValues.orange2?.value,
+      };
 
       // 3. Start a new create run with adjusted variables
       const response = await fetch(`${SERVER_URL}/api/progressive-tuning/start`, {
@@ -324,7 +345,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
           mode: 'create',
           GND_config: savedGndConfig,
           initial_variables,
-          antenna_name: savedAntennaName,
+          antenna_name: retryAntennaName,
         }),
       });
 
@@ -349,6 +370,66 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
     } finally {
       setIsRetrying(false);
     }
+  };
+
+  const handleAbortInvalidProfile = async () => {
+    setIsStopping(true);
+    try {
+      const stopResponse = await fetch(`${SERVER_URL}/api/matlab/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const stopData = await stopResponse.json();
+
+      const remainingMatlab = stopData?.summary?.remainingMatlab ?? 0;
+      const remainingHfss = stopData?.summary?.remainingHfss ?? 0;
+      const stoppedByStopSummary = stopData?.success && remainingMatlab === 0 && remainingHfss === 0;
+      const stoppedByLiveStatus = await confirmProcessesStopped();
+
+      if (!(stoppedByStopSummary && stoppedByLiveStatus)) {
+        showAlert('Abort Failed', 'Could not fully terminate MATLAB/HFSS processes. Please stop again.');
+        return;
+      }
+
+      await fetch(`${SERVER_URL}/api/progressive-tuning/reset`, { method: 'POST' });
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      showAlert('Profile Aborted', 'Invalid profile aborted. Returning to setup page.');
+      if (onStopped) onStopped();
+    } catch (error) {
+      showAlert('Abort Error', `Could not abort profile: ${error.message}`);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
+  const getAdjustPercent = (data) => {
+    const range = (data.max - data.min);
+    if (!isFinite(range) || range <= 0) return 0;
+    return Math.max(0, Math.min(100, ((data.value - data.min) / range) * 100));
+  };
+
+  const updateAdjustValueFromTrack = (varName, locationX) => {
+    const data = adjustValues[varName];
+    const width = adjustTrackWidths[varName];
+    if (!data || !width || width <= 0) return;
+
+    const clampedX = Math.max(0, Math.min(locationX, width));
+    const fraction = clampedX / width;
+    const raw = data.min + fraction * (data.max - data.min);
+    const rounded = Math.round(raw * 10) / 10;
+    const clamped = Math.max(data.min, Math.min(data.max, rounded));
+
+    setAdjustValues(prev => ({
+      ...prev,
+      [varName]: {
+        ...prev[varName],
+        value: clamped,
+        inputText: String(clamped),
+      },
+    }));
   };
 
   /**
@@ -1451,11 +1532,14 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
   const elapsed = status?.elapsed_seconds || 0;
   const managerStatus = status?.manager?.status || status?.status || 'unknown';
   const statusFromFile = status?.status || 'starting';
-  const isFinished = ['completed', 'error', 'cancelled', 'stopped'].includes(managerStatus);
+  const isFinished = ['completed', 'error', 'cancelled', 'stopped', 'invalid', 'invalid_initial'].includes(managerStatus);
+  const errorType = status?.error_type || null;
+  const isInvalidState = statusFromFile === 'invalid' || statusFromFile === 'invalid_initial';
   const isInvalidInitial = statusFromFile === 'invalid_initial';
   const matlabAlive = status?.manager?.matlabAlive || false;
   const isStuckStarting = (statusFromFile === 'starting' || statusFromFile === 'resuming') && elapsed > 10;
-  const isMatlabCrashed = managerStatus === 'error' && statusFromFile === 'error';
+  const isHfssLicenseError = managerStatus === 'error' && statusFromFile === 'error' && errorType === 'hfss_license';
+  const isMatlabCrashed = managerStatus === 'error' && statusFromFile === 'error' && !isHfssLicenseError;
   const statusMessage = status?.status_message || '';
   const invalidDetails = status?.invalid_details || null;
 
@@ -1605,7 +1689,33 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
           )}
         </View>
 
-        {/* MATLAB Crash / Error Banner */}
+        {/* Invalid State Banner */}
+        {isInvalidState && (
+          <View style={styles.crashBanner}>
+            <Text style={styles.crashTitle}>⚠️ Invalid Tuning State</Text>
+            <Text style={styles.crashMessage}>
+              {status?.status_message || 'The current setup produced an invalid geometry or tuning state. Adjust values and retry.'}
+            </Text>
+          </View>
+        )}
+
+        {/* HFSS License Error Banner */}
+        {isHfssLicenseError && (
+          <View style={styles.crashBanner}>
+            <Text style={styles.crashTitle}>🔒 HFSS License Error</Text>
+            <Text style={styles.crashMessage}>
+              {status?.status_message || 'HFSS license checkout failed during tuning.'}
+            </Text>
+            <Text style={styles.crashHint}>
+              Ensure an ANSYS HFSS license is available, then retry the run.
+            </Text>
+            <TouchableOpacity style={styles.crashBackButton} onPress={onBack}>
+              <Text style={styles.crashBackButtonText}>← Go Back & Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* MATLAB Crash / Generic Error Banner */}
         {isMatlabCrashed && (
           <View style={styles.crashBanner}>
             <Text style={styles.crashTitle}>❌ MATLAB Exited Unexpectedly</Text>
@@ -1985,45 +2095,57 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
           );
         })}
 
-        {/* Control Buttons — Invalid Initial: show Adjust & Retry */}
-        {isInvalidInitial && (
+        {/* Control Buttons — Invalid state: set orange/orange2 or abort profile */}
+        {isInvalidState && (
           <View style={styles.controlRow}>
-            <TouchableOpacity
-              style={[styles.controlButton, { backgroundColor: '#6b7280' }]}
-              onPress={onBack}
-            >
-              <Text style={styles.controlButtonText}>← Back</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.controlButton, styles.adjustRetryButton]}
               onPress={() => {
-                // Pre-fill slider values from invalid_details
                 const vars = invalidDetails?.variables_to_adjust || {};
-                const initial = {};
-                Object.entries(vars).forEach(([key, data]) => {
-                  initial[key] = {
-                    value: data.current ?? data.value ?? 0,
-                    min: data.range?.[0] ?? 0,
-                    max: data.range?.[1] ?? 100,
-                  };
-                });
-                // If no variables provided, use defaults for orange/orange2
-                if (Object.keys(initial).length === 0) {
-                  initial.orange  = { value: 30, min: 10, max: 90 };
-                  initial.orange2 = { value: 66, min: 10, max: 90 };
-                }
+                const currentOrange = status?.phase3?.tuned_variables?.orange?.current;
+                const currentOrange2 = status?.phase3?.tuned_variables?.orange2?.current;
+                const initial = {
+                  orange: {
+                    value: vars.orange?.current ?? vars.orange?.value ?? currentOrange ?? 30,
+                    min: vars.orange?.range?.[0] ?? 10,
+                    max: vars.orange?.range?.[1] ?? 90,
+                    inputText: String(vars.orange?.current ?? vars.orange?.value ?? currentOrange ?? 30),
+                  },
+                  orange2: {
+                    value: vars.orange2?.current ?? vars.orange2?.value ?? currentOrange2 ?? 55,
+                    min: vars.orange2?.range?.[0] ?? 10,
+                    max: vars.orange2?.range?.[1] ?? 90,
+                    inputText: String(vars.orange2?.current ?? vars.orange2?.value ?? currentOrange2 ?? 55),
+                  },
+                };
                 setAdjustValues(initial);
                 setShowAdjustModal(true);
               }}
             >
-              <Text style={styles.controlButtonText}>🔧 Adjust & Retry</Text>
+              <Text style={styles.controlButtonText}>🔧 Set orange/orange2</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.controlButton, styles.stopButton, isStopping && styles.stopButtonDisabled]}
+              disabled={isStopping}
+              onPress={() => {
+                showAlert(
+                  'Abort Invalid Profile',
+                  'This will abort the invalid profile and return to setup.',
+                  [
+                    { text: 'No', style: 'cancel' },
+                    { text: 'Yes, Abort', onPress: handleAbortInvalidProfile, style: 'destructive' },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.controlButtonText}>{isStopping ? '⏳ Aborting...' : '⛔ Abort Profile'}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Control Buttons — Normal running */}
-        {!isFinished && !isInvalidInitial && (
+        {!isFinished && !isInvalidState && (
           <View style={styles.controlRow}>
             {/* Running indicator (disabled, grey) */}
             <View style={[styles.controlButton, styles.runningButton]}>
@@ -2102,50 +2224,76 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, projectP
                     <View style={styles.adjustSliderValueBox}>
                       <TextInput
                         style={styles.adjustSliderInput}
-                        value={String(data.value)}
+                        value={data.inputText ?? String(data.value)}
                         keyboardType="numeric"
                         onChangeText={(text) => {
-                          const num = parseFloat(text);
-                          if (!isNaN(num)) {
+                          const trimmed = text.trim();
+                          if (trimmed === '' || trimmed === '-' || trimmed === '.' || trimmed === '-.') {
                             setAdjustValues(prev => ({
                               ...prev,
-                              [varName]: { ...prev[varName], value: Math.max(data.min, Math.min(data.max, num)) },
+                              [varName]: { ...prev[varName], inputText: text },
+                            }));
+                            return;
+                          }
+
+                          const num = Number(trimmed);
+                          if (!Number.isNaN(num)) {
+                            const clamped = Math.max(data.min, Math.min(data.max, num));
+                            setAdjustValues(prev => ({
+                              ...prev,
+                              [varName]: {
+                                ...prev[varName],
+                                value: clamped,
+                                inputText: text,
+                              },
                             }));
                           }
+                        }}
+                        onBlur={() => {
+                          setAdjustValues(prev => {
+                            const current = prev[varName];
+                            if (!current) return prev;
+                            return {
+                              ...prev,
+                              [varName]: {
+                                ...current,
+                                inputText: String(current.value),
+                              },
+                            };
+                          });
                         }}
                       />
                     </View>
                   </View>
                   {/* Slider track */}
-                  <View style={styles.adjustSliderTrack}>
+                  <View
+                    style={styles.adjustSliderTrack}
+                    onLayout={(e) => {
+                      const w = e.nativeEvent.layout.width;
+                      if (!w) return;
+                      setAdjustTrackWidths(prev => ({ ...prev, [varName]: w }));
+                    }}
+                    onStartShouldSetResponder={() => true}
+                    onMoveShouldSetResponder={() => true}
+                    onResponderGrant={(e) => {
+                      updateAdjustValueFromTrack(varName, e.nativeEvent.locationX);
+                    }}
+                    onResponderMove={(e) => {
+                      updateAdjustValueFromTrack(varName, e.nativeEvent.locationX);
+                    }}
+                  >
                     <View
                       style={[styles.adjustSliderFill, {
-                        width: `${((data.value - data.min) / (data.max - data.min)) * 100}%`,
+                        width: `${getAdjustPercent(data)}%`,
                       }]}
                     />
-                    {/* Draggable thumb area — use touch on the full track */}
-                    <TouchableOpacity
+                    <View
+                      pointerEvents="none"
                       style={[styles.adjustSliderThumb, {
-                        left: `${((data.value - data.min) / (data.max - data.min)) * 100}%`,
+                        left: `${getAdjustPercent(data)}%`,
                       }]}
-                      activeOpacity={1}
                     />
                   </View>
-                  {/* Clickable slider track for web — handles onMouseDown position */}
-                  {Platform.OS === 'web' && (
-                    <View
-                      style={styles.adjustSliderClickArea}
-                      onMouseDown={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const fraction = (e.clientX - rect.left) / rect.width;
-                        const newVal = data.min + fraction * (data.max - data.min);
-                        setAdjustValues(prev => ({
-                          ...prev,
-                          [varName]: { ...prev[varName], value: Math.round(Math.max(data.min, Math.min(data.max, newVal)) * 10) / 10 },
-                        }));
-                      }}
-                    />
-                  )}
                   <View style={styles.adjustSliderLabels}>
                     <Text style={styles.adjustSliderRangeLabel}>{data.min}</Text>
                     <Text style={styles.adjustSliderRangeLabel}>{data.max}</Text>

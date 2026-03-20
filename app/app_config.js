@@ -30,11 +30,12 @@ const resolvedServerHost = (() => {
 })();
 
 const resolvedServerPort = (() => {
-  if (isElectronDesktop && hasWindow) {
-    const runtimePort = Number(window.location?.port || 0);
-    if (Number.isInteger(runtimePort) && runtimePort > 0) {
-      return runtimePort;
+  if (isElectronDesktop) {
+    const configuredPort = Number(config.server?.port || 0);
+    if (Number.isInteger(configuredPort) && configuredPort > 0) {
+      return configuredPort;
     }
+    return 3001;
   }
 
   if (isBrowserRuntime && hasWindow) {
