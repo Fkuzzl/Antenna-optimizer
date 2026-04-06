@@ -157,7 +157,7 @@ const AboutPage = ({ onBack }) => {
           
           <InfoRow 
             label="Setup Guide" 
-            value="See OPEN_THIS/SETUP/README.md" 
+            value="See README.md (Setup section)" 
           />
           
           <InfoRow 

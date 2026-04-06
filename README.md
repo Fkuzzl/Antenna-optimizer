@@ -17,6 +17,12 @@ Notes:
 - The app asks you to confirm `matlab.exe` and `ansysedt.exe` on first launch.
 - Python runtime is handled by the application in installer mode.
 
+For source mode only:
+
+- Run `npm install`
+- Run `npm run setup` to generate/update setup configuration
+- If auto-detection fails, run `node OPEN_THIS/SETUP/quick_setup.js --manual`
+
 ---
 
 ## 2) What You Do in the App (User Input)
@@ -40,6 +46,12 @@ Typical inputs from the user:
 - Ground-plane and position values must stay within physically valid design ranges.
 - DXF files must pass app validation before simulation.
 - During long runs, do not close required external tools/processes unexpectedly.
+
+DXF validation rules used by the app:
+
+- Minimum size: 25 mm × 25 mm
+- Supported entities: POLYLINE, LWPOLYLINE, LINE, CIRCLE, ARC
+- Cross/plus-style shapes must preserve enough center area for antenna placement
 
 ---
 
@@ -107,6 +119,7 @@ Expected outputs include:
 ## 7) Common Recovery Actions
 
 - Setup fails: re-check `matlab.exe` and `ansysedt.exe` paths.
+- Source mode setup fails: rerun `npm run setup` (or `node OPEN_THIS/SETUP/quick_setup.js --manual`).
 - Run does not progress: stop run, validate project and geometry inputs, rerun.
 - HFSS error/license issue: resolve solver/license availability, then retry.
 - Port/process conflict: close stale MATLAB/HFSS/Node processes and restart app.
