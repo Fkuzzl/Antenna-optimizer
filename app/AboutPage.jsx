@@ -152,7 +152,7 @@ const AboutPage = ({ onBack }) => {
           
           <InfoRow 
             label="Documentation" 
-            value="See DOCUMENTATION.md" 
+            value="See README.md and DEVELOPER_GUIDE.md" 
           />
           
           <InfoRow 

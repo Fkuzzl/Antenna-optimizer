@@ -1,151 +1,126 @@
-# Antenna Optimizer - Interface for MATLAB Multi-Objective Evolutionary Algorithm Implementation
+# Antenna Optimizer
 
-Automated antenna design optimization system using MATLAB-HFSS integration with real-time monitoring.
+Antenna Optimizer is a desktop application that guides users through antenna tuning workflows using MATLAB + HFSS and then presents optimization and verification results in one UI.
 
-## Features
+---
 
-- **78-variable optimization** system for antenna design parameters
-- **Real-time progress monitoring** via WebSocket
-- **Cross-platform support** (iOS, Android, Web via Expo)
-- **Custom ground plane import** import (DXF format)
-- **Automated MATLAB-HFSS** integration
+## 1) System Requirements
 
-### Installation
+For normal user operation (Windows desktop installer mode):
 
-**Step 1: Clone Repository**
-```bash
-git clone https://github.com/Fkuzzl/Antenna-optimizer.git
-cd Antenna-optimizer
-```
+- Windows 10/11
+- MATLAB (R2020b or newer recommended)
+- Ansys Electronics Desktop / HFSS (compatible with your project)
 
-**Step 2: Install Prerequisites**
+Notes:
 
-Ensure the following software is installed on your system:
-- **Node.js** 18+ - [Download](https://nodejs.org/)
-- **Python** 3.8+ - [Download](https://www.python.org/)
-- **MATLAB** R2020b+ - [MathWorks](https://www.mathworks.com/)
-- **HFSS** (Ansys Electronics Desktop before 2024 R2)
+- The app asks you to confirm `matlab.exe` and `ansysedt.exe` on first launch.
+- Python runtime is handled by the application in installer mode.
 
-**Step 3: Run Setup**
+---
 
-Navigate to the `OPEN_THIS` folder and run the setup script:
-```bash
-cd OPEN_THIS
-run_setup.bat
-```
+## 2) What You Do in the App (User Input)
 
-The setup wizard will:
-- Detect your IP address and available ports
-- Find MATLAB & Python installations
-- Install required Python libraries (pandas, openpyxl, ezdxf, shapely)
-- Generate configuration file (`setup_variable.json`)
+Typical inputs from the user:
 
-**Step 4: Start Application**
+1. Select MATLAB project/script (usually `.mlx` workflow entry).
+2. Select optimization variables (all variables or custom subset).
+3. Configure ground plane:
+   - Parametric mode (dimensions + position), or
+   - DXF mode (upload DXF + position/alignment values).
+4. Start run and monitor progress.
+5. Review optimization and verification outputs.
 
-After setup completes, run:
-```bash
-start_application.bat
-```
+---
 
-This will:
-- Start the Node.js server
-- Open the application in your default browser
-- Display the access URL (e.g., http://YOUR_IP:8081)
+## 3) Input Constraints You Must Respect
 
-**Step 5: Stop Application**
+- MATLAB and HFSS paths must point to valid executable files.
+- Project path must match expected optimization project structure.
+- Ground-plane and position values must stay within physically valid design ranges.
+- DXF files must pass app validation before simulation.
+- During long runs, do not close required external tools/processes unexpectedly.
 
-To close all servers when finished:
-```bash
-stop_application_server.bat
-```
+---
 
-This will terminate all Node.js processes (server and Expo).
+## 4) Full Antenna Tuning Flow
 
-## Usage
+### Step A: Setup
 
-1. **Select Variables**: Choose optimization parameters (up to 78 variables)
-2. **Configure Ground Plane**: Set dimensions and antenna position
-3. **Run Optimization**: Execute MATLAB Live Script (.mlx file)
-4. **Monitor Progress**: View real-time iteration updates via WebSocket
-5. **View Results**: Access consolidated Excel reports
+1. Install and launch Antenna Optimizer.
+2. Setup Wizard asks for:
+   - `matlab.exe`
+   - `ansysedt.exe`
+3. Save setup and open main app.
 
-## Project Structure
+### Step B: Design Preparation
 
-```
-├── app/                    # React Native frontend
-│   ├── index.jsx          # Home page and navigation
-│   ├── app_config.js      # Centralized configuration
-│   ├── MatlabProjectRunner.jsx    # MATLAB execution interface
-│   ├── AntennaVariableSelector.jsx # Variable selection
-│   ├── GroundPlaneConfigurator.jsx # Ground plane setup
-│   └── SimulationResultsViewer.jsx # Results display
-├── server/                 # Node.js backend (Modular V2 Architecture)
-│   ├── server.js          # Main server entry point
-│   ├── routes/            # API endpoints (matlab, variables, gnd, etc.)
-│   ├── services/          # Business logic (WebSocket, process, Excel)
-│   ├── middleware/        # Validation and error handling
-│   ├── config/            # Constants and logger configuration
-│   ├── utils/             # Helper functions
-│   └── v1_archived/       # Legacy monolithic server (reference only)
-├── scripts/                # Python utilities
-│   ├── generate_f_model.py         # Generate F_Model_Element.m
-│   ├── update_excel_incremental.py # Excel processing
-│   └── gnd_importer/      # DXF geometry parser
-├── config/                 # Variable definitions (78 parameters)
-│   └── antenna_variables.json
-├── OPEN_THIS/SETUP/        # Auto-setup wizard
-│   ├── quick_setup.js     # Interactive setup
-│   └── requirements.txt   # Python dependencies
-└── test_files/dxf/         # Sample DXF files for testing
-```
+1. Choose project/script.
+2. Choose variables.
+3. Set ground-plane (parametric or DXF).
+4. Apply configuration.
 
-## Troubleshooting
+### Step C: Run Optimization
 
-**Setup fails to detect MATLAB/Python:**
-```bash
-node OPEN_THIS/SETUP/quick_setup.js --manual
-```
+1. Start run from app.
+2. App backend orchestrates MATLAB + HFSS.
+3. Progress/state updates stream in real time.
 
-**Port already in use:**
-```bash
-npm run kill-server
-# Or edit OPEN_THIS/SETUP/setup_variable.json
-```
+### Step D: Review Results
 
-**Python library errors:**
-```bash
-pip install -r OPEN_THIS/SETUP/requirements.txt
-```
+1. Open results pages after run finishes.
+2. Inspect metrics and generated artifacts.
+3. Use verification charts and summaries to judge design quality.
 
-**Server won't start:**
-- Verify `OPEN_THIS/SETUP/setup_variable.json` exists
-- Run setup again: `npm run setup`
+---
 
-## Documentation
+## 5) MATLAB/HFSS Execution Flow (What Happens Behind the UI)
 
-- **[DOCUMENTATION.md](DOCUMENTATION.md)** - Complete technical documentation
-  - System architecture
-  - API reference
-  - WebSocket protocol
-  - Performance metrics
-  - Advanced configuration
-- **[server/README.md](server/README.md)** - Server architecture and API endpoints
-- **[EXCEL_UPDATE_GUIDE.md](EXCEL_UPDATE_GUIDE.md)** - Excel processing guide
-- **[PAGINATION_TEST_GUIDE.md](PAGINATION_TEST_GUIDE.md)** - Pagination testing
+1. UI sends run request to backend.
+2. Backend prepares inputs (variables, GND config, project context).
+3. MATLAB workflow executes and coordinates HFSS simulation sweeps.
+4. MATLAB/Python helper processing produces charts + summaries.
+5. Backend serves generated files/status back to the UI.
 
-## Technology Stack
+Short architecture view:
 
-- **Frontend**: React Native 0.81.4 + Expo ~54.0.10
-- **Backend**: Node.js + Express 5.1.0 (Modular V2 Architecture)
-- **Real-time**: WebSocket (ws 8.18.3)
-- **Data Processing**: Python 3.8+ (pandas, openpyxl, ezdxf, shapely)
-- **Optimization**: MATLAB R2020b+ + HFSS 2022 R2
+`UI (Electron + React/Expo) -> Node/Express backend -> MATLAB orchestrator -> HFSS solver -> result files -> UI`
 
-## Electron (Desktop Packaging)
+---
 
-- Main branch remains Expo-first.
-- Electron implementation is prepared on branch: `feature/electron-windows`.
-- See [ELECTRON_WINDOWS_SETUP.md](ELECTRON_WINDOWS_SETUP.md) for development and Windows packaging steps.
+## 6) What You Get from This Application
+
+Expected outputs include:
+
+- Optimization status and progression history
+- Selected/best variable sets from optimization profile
+- Verification visual outputs:
+  - S11 chart
+  - Axial Ratio chart
+  - Gain chart
+  - Smith chart
+- Summary values around GPS L1 target (1.575 GHz)
+- Saved run artifacts for traceability and handoff
+
+---
+
+## 7) Common Recovery Actions
+
+- Setup fails: re-check `matlab.exe` and `ansysedt.exe` paths.
+- Run does not progress: stop run, validate project and geometry inputs, rerun.
+- HFSS error/license issue: resolve solver/license availability, then retry.
+- Port/process conflict: close stale MATLAB/HFSS/Node processes and restart app.
+
+---
+
+## 8) Need Technical/Developer Details?
+
+See the developer documentation:
+
+- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+
+---
 
 ## Author
+
 Mario Ma (https://github.com/Fkuzzl)

@@ -223,7 +223,7 @@ If upgrading from V1:
 
 For issues or questions:
 1. Check `logs/` directory for error details
-2. Review documentation in `DOCUMENTATION.md`
+2. Review maintenance notes in `DEVELOPER_GUIDE.md`
 3. Reference V1 archived code if needed
 
 ---
