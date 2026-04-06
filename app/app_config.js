@@ -3,7 +3,7 @@
 // 
 // ⚠️ IMPORTANT:
 // - Desktop EXE users should use the in-app Setup Wizard to configure paths.
-// - Source/dev users can still run OPEN_THIS/run_setup.bat or npm run setup.
+// - Source/dev users can run npm run setup.
 
 import { Alert, Platform } from 'react-native';
 import setupVariableConfig from '../OPEN_THIS/SETUP/setup_variable.json';

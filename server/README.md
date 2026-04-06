@@ -99,18 +99,12 @@ server/
 ### Start Server
 ```bash
 # From project root
-cd OPEN_THIS
-start_application.bat
-
-# Or manually
-cd server
-node start-server.js
+npm run server
 ```
 
 ### Stop Server
 ```bash
-cd OPEN_THIS
-stop_application_server.bat
+npm run kill-server
 ```
 
 ## 🔧 Configuration

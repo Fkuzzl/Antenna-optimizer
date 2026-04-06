@@ -52,7 +52,7 @@ class QuickSetup {
 
         console.log('\n✅ Setup complete!\n');
         console.log('📝 Next steps:');
-        console.log('   1. Run start_application.bat to launch the server');
+        console.log('   1. Run npm run desktop:dev (or npm run server + npm run web)');
         console.log('   2. Wait for the server to start completely');
         console.log(`   3. The application will automatically pop out in browser, or you can open it manually at http://${this.detectedConfig.ip}:8081\n`);
         

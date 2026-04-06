@@ -38,7 +38,6 @@ const SettingsPage = ({ onBack }) => {
     const message = isElectronDesktop
       ? 'Desktop (EXE) mode:\n\nUse "Run Setup Wizard" to reconfigure MATLAB, Python, and HFSS paths.\n\nThe app will guide you file-by-file and then save config automatically.'
       : 'To reconfigure settings, run the setup wizard:\n\n' +
-        'Windows: Double-click OPEN_THIS/run_setup.bat\n' +
         'Command: npm run setup';
     
     showAlert('Run Setup Wizard', message);
@@ -172,7 +171,7 @@ const SettingsPage = ({ onBack }) => {
                 - MATLAB installation path (where MATLAB.exe is located){'\n'}
                 - Python executable path (for processing scripts){'\n'}
                 - Project directories (where optimization files are stored){'\n\n'}
-                To update: {isElectronDesktop ? 'Run Setup Wizard (below)' : 'Run OPEN_THIS/run_setup.bat'}
+                To update: {isElectronDesktop ? 'Run Setup Wizard (below)' : 'Run npm run setup'}
               </Text>
             </View>
           </View>
