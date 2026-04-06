@@ -26,7 +26,6 @@ server/
 │   └── helpers.js        # Error handling, validation
 ├── logs/                  # Server logs (auto-generated)
 ├── uploads/               # File uploads (GND files)
-├── v1_archived/          # Legacy server (archived)
 ├── server.js             # Main server entry point
 └── start-server.js       # Server launcher script
 ```
@@ -169,15 +168,6 @@ npm install
 - Validate inputs with middleware
 - Sanitize errors before sending to client
 
-## 📁 V1 Legacy Server
-
-The original monolithic server (3200+ lines) has been archived:
-- **Location**: `server/v1_archived/matlab-server.js`
-- **Status**: Read-only reference
-- **Why archived**: Replaced by modular V2 architecture
-
-See `server/v1_archived/README.md` for details.
-
 ## 🔐 Security
 
 - **Path validation** - Prevents directory traversal attacks
@@ -193,14 +183,6 @@ See `server/v1_archived/README.md` for details.
 - **Connection pooling** - Optimized HTTP keep-alive
 - **Process cleanup** - Graceful shutdown
 - **WebSocket heartbeat** - Dead connection detection
-
-## 📝 Migration from V1
-
-If upgrading from V1:
-1. ✅ All endpoints maintain backward compatibility
-2. ✅ Response formats unchanged
-3. ✅ No application code changes needed
-4. ✅ Start with `node start-server.js` (automatically uses new server)
 
 ## 🐛 Troubleshooting
 

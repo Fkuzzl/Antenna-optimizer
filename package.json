@@ -12,7 +12,6 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "node server/start-server.js",
-    "server-direct": "node server/matlab-server.js",
     "kill-server": "taskkill /F /IM node.exe 2>nul || echo No Node.js processes found",
     "check-connections": "netstat -an | findstr :3001",
     "desktop:dev": "cross-env SETUP_CONFIG_PATH=OPEN_THIS/SETUP/setup_variable.json ELECTRON_USER_DATA_PATH=.electron-dev-profile ELECTRON_DISABLE_GPU_CACHE=1 concurrently -n SERVER,WEB,ELECTRON -c green,blue,magenta \"npm run server\" \"npm run web -- --port 8081 --host localhost\" \"wait-on tcp:3001 http://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 electron electron/main.js\"",
@@ -78,11 +77,21 @@
     "directories": {
       "output": "electron-dist"
     },
+    "extraResources": [
+      {
+        "from": "OPEN_THIS/SETUP/python-runtime",
+        "to": "python-runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "extraMetadata": {
       "main": "electron/main.js"
     },
     "win": {
       "signAndEditExecutable": false,
+      "executableName": "Antenna Optimizer",
       "target": [
         "nsis"
       ],
