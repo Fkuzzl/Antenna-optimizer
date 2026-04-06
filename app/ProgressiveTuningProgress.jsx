@@ -1014,6 +1014,15 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
   // ─────────────────────────────────────────────────────────────
   const renderPhase3Detail = (phaseData, phaseLabel, isExpanded) => {
     if (!phaseData) return null;
+    const phase3TargetAR = resolveMetricValue(phaseData.target_AR) ?? 2;
+    const p3StatusMsg = phaseData.status_message || status?.status_message || '';
+    const p3CaseLabel = /case\s*1/i.test(p3StatusMsg)
+      ? 'CASE 1 · FINISH'
+      : /case\s*2/i.test(p3StatusMsg)
+        ? 'CASE 2 · FREQUENCY MISMATCH'
+        : /case\s*3/i.test(p3StatusMsg)
+          ? 'CASE 3 · TUNE ANGLES'
+          : null;
     const rawAR  = phaseData.current_AR;
     const arKeys = ['x1_570', 'x1_575', 'x1_580'];
     const arFreqs = [1.570, 1.575, 1.580];
@@ -1046,6 +1055,11 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
             <Text style={[styles.statusMessageText, { color: phaseLabel.color }]}>
               {phaseData.status_message || status?.status_message}
             </Text>
+            {p3CaseLabel && (
+              <Text style={[styles.statusMessageText, { color: '#64748b', marginTop: 4, fontWeight: '700' }]}>
+                {p3CaseLabel}
+              </Text>
+            )}
           </View>
         )}
 
@@ -1072,7 +1086,7 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
                     </Text>
                     {isPrimary && ar575 != null && (
                       <Text style={{ fontSize: 10, color: getARColor(ar575), fontWeight: '600', marginTop: 2 }}>
-                        {ar575 <= 2 ? '✓ Target met' : `Target: ≤ 2 dB`}
+                        {ar575 <= phase3TargetAR ? '✓ Target met' : `Target: ≤ ${phase3TargetAR.toFixed(1).replace(/\.0$/, '')} dB`}
                       </Text>
                     )}
                   </View>
@@ -1116,39 +1130,39 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
             </View>
             {/* Guide: explain the pre-step sequence to the user */}
             <View style={styles.p3GuideBox}>
-              <Text style={styles.p3GuideTitle}>🔄 What is happening?</Text>
+              <Text style={styles.p3GuideTitle}>🔄 Phase 3 Case Logic</Text>
               <Text style={styles.p3GuideText}>
-                Before tuning begins, MATLAB runs up to 3 preparatory HFSS simulations to assess the CP loop state:
+                MATLAB follows this 3-case decision using AR at 1.570 / 1.575 / 1.580 GHz:
               </Text>
               <View style={styles.p3GuideStep}>
                 <Text style={styles.p3GuideStepNum}>❶</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.p3GuideStepTitle}>Initial evaluation</Text>
+                  <Text style={styles.p3GuideStepTitle}>Case 1: Finish</Text>
                   <Text style={styles.p3GuideStepDesc}>
-                    Simulates the current <Text style={{ fontStyle: 'italic' }}>orange</Text> &amp; <Text style={{ fontStyle: 'italic' }}>orange2</Text> values at 1.570 / 1.575 / 1.580 GHz to classify whether the CP loop is formed, oversized, or absent.
+                    If AR at 1.575 GHz is below target, Phase 3 finishes immediately.
                   </Text>
                 </View>
               </View>
               <View style={styles.p3GuideStep}>
                 <Text style={styles.p3GuideStepNum}>❷</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.p3GuideStepTitle}>orange2 neutral reset <Text style={styles.p3GuideStepOptional}>(if no loop)</Text></Text>
+                  <Text style={styles.p3GuideStepTitle}>Case 2: Frequency mismatch</Text>
                   <Text style={styles.p3GuideStepDesc}>
-                    If <Text style={{ fontStyle: 'italic' }}>orange2</Text> is too high it over-shrinks the loop and blocks formation. MATLAB resets it to the midpoint so <Text style={{ fontStyle: 'italic' }}>orange</Text> can form the loop freely.
+                    If AR@1.575 is above target but a side point is below target, MATLAB corrects resonance first (brown / ngreen / bluel).
                   </Text>
                 </View>
               </View>
               <View style={styles.p3GuideStep}>
                 <Text style={styles.p3GuideStepNum}>❸</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.p3GuideStepTitle}>Pre-shrink <Text style={styles.p3GuideStepOptional}>(if loop too large)</Text></Text>
+                  <Text style={styles.p3GuideStepTitle}>Case 3: Tune orange / orange2</Text>
                   <Text style={styles.p3GuideStepDesc}>
-                    If the loop spans too many frequencies (high AR standard deviation), MATLAB increases <Text style={{ fontStyle: 'italic' }}>orange2</Text> to compact it until AR at 1.575 GHz is near 2 dB before the main bisection begins.
+                    If all three AR points are above target, MATLAB tunes orange and orange2 by bisection.
                   </Text>
                 </View>
               </View>
               <Text style={[styles.p3GuideText, { marginTop: 8, color: '#64748b', fontStyle: 'italic' }]}>
-                Each step takes one full HFSS simulation. The AR gauges above will appear once the first simulation completes.
+                The live status line above indicates which case is active.
               </Text>
             </View>
           </View>
@@ -1236,10 +1250,9 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
                   const stepLabel = (() => {
                     const s = row.step || '';
                     if (s === 'init') return 'Init';
-                    if (s.includes('freq_corr')) return '△f';
+                    if (s.includes('freq_corr')) return 'FreqCorr';
                     if (s === 'orange') return 'Og↑';
                     if (s === 'orange2') return 'Og2';
-                    if (s.startsWith('preshrink')) return 'Shrink';
                     return s || '—';
                   })();
                   return (
@@ -1747,6 +1760,12 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
           const phaseStatus = getPhaseStatus(phaseId);
           const statusConf = STATUS_CONFIG[phaseStatus] || STATUS_CONFIG.pending;
           const phaseData = getPhaseData(phaseId);
+          const phaseTargetText = (() => {
+            if (phaseId !== 3) return phaseLabel.target;
+            const p3Target = resolveMetricValue(phaseData?.target_AR) ?? resolveMetricValue(status?.phase3?.target_AR);
+            if (p3Target == null) return phaseLabel.target;
+            return `AR < ${Number(p3Target).toFixed(1).replace(/\.0$/, '')} dB`;
+          })();
           const isCurrentPhase = phaseStatus === 'running';
           const isCompleted = phaseStatus === 'completed';
           const isPending = phaseStatus === 'pending';
@@ -1822,9 +1841,9 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
                     );
                   })()}
                   {/* Non-completed: show target */}
-                  {!isCompleted && <Text style={styles.phaseTarget}>Target: {phaseLabel.target}</Text>}
+                  {!isCompleted && <Text style={styles.phaseTarget}>Target: {phaseTargetText}</Text>}
                   {/* Expanded completed: show target */}
-                  {isCompleted && !isCollapsed && <Text style={styles.phaseTarget}>Target: {phaseLabel.target}</Text>}
+                  {isCompleted && !isCollapsed && <Text style={styles.phaseTarget}>Target: {phaseTargetText}</Text>}
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: statusConf.bgColor }]}>
                   <Text style={[styles.statusBadgeText, { color: statusConf.color }]}>
@@ -2011,10 +2030,9 @@ export default function ProgressiveTuningProgress({ onBack, onComplete, onStoppe
                               const stepLabel = (() => {
                                 const s = row.step || '';
                                 if (s === 'init') return 'Init';
-                                if (s.includes('freq_corr')) return '△f';
+                                if (s.includes('freq_corr')) return 'FreqCorr';
                                 if (s === 'orange') return 'Og↑';
                                 if (s === 'orange2') return 'Og2';
-                                if (s.startsWith('preshrink')) return 'Shrink';
                                 return s || '—';
                               })();
                               return (

@@ -57,14 +57,6 @@
       </div>
 
       <div class="row">
-        <label class="label" for="pythonPath">Python executable (python.exe)</label>
-        <div class="input-row">
-          <input id="pythonPath" placeholder="Select python.exe" />
-          <button class="browse" id="browsePython">Browse...</button>
-        </div>
-      </div>
-
-      <div class="row">
         <label class="label" for="hfssPath">HFSS executable (ansysedt.exe)</label>
         <div class="input-row">
           <input id="hfssPath" placeholder="Select ansysedt.exe" />
@@ -85,7 +77,6 @@
   <script>
     const els = {
       matlab: document.getElementById('matlabPath'),
-      python: document.getElementById('pythonPath'),
       hfss: document.getElementById('hfssPath'),
       status: document.getElementById('status'),
       configPath: document.getElementById('configPath'),
@@ -100,25 +91,22 @@
     async function browseForPath(kind) {
       const defaults = {
         matlab: { title: 'Select matlab.exe', buttonLabel: 'Select matlab.exe', defaultPath: els.matlab.value },
-        python: { title: 'Select python.exe', buttonLabel: 'Select python.exe', defaultPath: els.python.value },
         hfss: { title: 'Select ansysedt.exe', buttonLabel: 'Select ansysedt.exe', defaultPath: els.hfss.value }
       };
 
       const result = await window.setupWizard.pickFile(defaults[kind]);
       if (result && !result.canceled && result.path) {
         if (kind === 'matlab') els.matlab.value = result.path;
-        if (kind === 'python') els.python.value = result.path;
         if (kind === 'hfss') els.hfss.value = result.path;
       }
     }
 
     async function saveAndContinue() {
       try {
-        setStatus('Validating paths and checking Python libraries...');
+        setStatus('Validating MATLAB/HFSS paths and preparing runtime dependencies...');
         els.save.disabled = true;
         const result = await window.setupWizard.submit({
           matlabPath: els.matlab.value.trim(),
-          pythonPath: els.python.value.trim(),
           hfssPath: els.hfss.value.trim()
         });
 
@@ -152,22 +140,20 @@
           throw new Error('Setup bridge is not available. Please restart the application.');
         }
 
-        setStatus('Detecting installed tools...');
+        setStatus('Detecting MATLAB and HFSS installations...');
         const init = await window.setupWizard.getInitialData();
         els.matlab.value = init.matlabPath || '';
-        els.python.value = init.pythonPath || '';
         els.hfss.value = init.hfssPath || '';
         els.configPath.textContent = init.setupConfigPath || '(unknown)';
 
-        const detectedCount = [init.matlabPath, init.pythonPath, init.hfssPath].filter(Boolean).length;
-        setStatus(`Auto-detection complete: ${detectedCount}/3 paths detected.`);
+        const detectedCount = [init.matlabPath, init.hfssPath].filter(Boolean).length;
+        setStatus(`Auto-detection complete: ${detectedCount}/2 paths detected. Python runtime is configured automatically.`);
       } catch (error) {
         setStatus(error?.message || 'Failed to initialize setup wizard.', true);
       }
     }
 
     document.getElementById('browseMatlab').addEventListener('click', () => browseForPath('matlab'));
-    document.getElementById('browsePython').addEventListener('click', () => browseForPath('python'));
     document.getElementById('browseHfss').addEventListener('click', () => browseForPath('hfss'));
     document.getElementById('saveBtn').addEventListener('click', saveAndContinue);
     document.getElementById('cancelBtn').addEventListener('click', () => window.setupWizard.cancel());

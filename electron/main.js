@@ -46,6 +46,26 @@ function getProjectRoot() {
   return path.join(__dirname, '..');
 }
 
+function detectBundledPythonPath() {
+  const candidates = [];
+
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'python-runtime', 'python.exe'));
+  }
+
+  const projectRoot = getProjectRoot();
+  candidates.push(path.join(projectRoot, 'python-runtime', 'python.exe'));
+  candidates.push(path.join(projectRoot, 'OPEN_THIS', 'SETUP', 'python-runtime', 'python.exe'));
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return '';
+}
+
 function getServerEntry() {
   return path.join(getProjectRoot(), 'server', 'server.js');
 }
@@ -66,23 +86,28 @@ function getProjectPathsConfig() {
   };
 }
 
-function buildSetupConfig({ matlabPath, pythonPath, hfssPath }) {
+function buildSetupConfig({ matlabPath, pythonPath, hfssPath, pythonMode = 'system', bundledPythonPath = '', systemPythonPath = '' }) {
   const host = '127.0.0.1';
   const port = 3001;
   const projectPaths = getProjectPathsConfig();
+  const mode = pythonMode === 'bundled' ? 'bundled' : 'system';
+  const selectedPythonPath = mode === 'bundled' ? bundledPythonPath : pythonPath;
 
   return {
     YOUR_IP_ADDRESS: host,
     SERVER_PORT: port,
     MATLAB_PATH: matlabPath,
-    PYTHON_PATH: pythonPath,
+    PYTHON_PATH: selectedPythonPath,
     config_version: '2.0.0',
     last_updated: new Date().toISOString().split('T')[0],
     matlab: {
       installation_paths: [matlabPath]
     },
     python: {
-      executable: pythonPath
+      mode,
+      executable: selectedPythonPath,
+      bundled_executable: bundledPythonPath || '',
+      system_executable: systemPythonPath || pythonPath || ''
     },
     server: {
       host,
@@ -127,7 +152,6 @@ function buildSetupConfig({ matlabPath, pythonPath, hfssPath }) {
 function validateSetupPaths({ matlabPath, pythonPath, hfssPath }) {
   const checks = [
     { value: matlabPath, expected: 'matlab.exe', label: 'MATLAB' },
-    { value: pythonPath, expected: 'python.exe', label: 'Python' },
     { value: hfssPath, expected: 'ansysedt.exe', label: 'HFSS' }
   ];
 
@@ -145,11 +169,55 @@ function validateSetupPaths({ matlabPath, pythonPath, hfssPath }) {
       throw new Error(`${item.label} executable must be ${item.expected}`);
     }
   }
+
+  if (!pythonPath || !pythonPath.trim()) {
+    throw new Error('Python runtime is not available. Please reinstall the app.');
+  }
+
+  if (!fs.existsSync(pythonPath)) {
+    throw new Error(`Python runtime not found: ${pythonPath}`);
+  }
+
+  const pythonName = path.basename(pythonPath).toLowerCase();
+  if (pythonName !== 'python.exe') {
+    throw new Error('Python executable must be python.exe');
+  }
 }
 
-function persistSetupConfig({ matlabPath, pythonPath, hfssPath }) {
+function resolvePythonRuntime() {
+  const bundledPythonPath = detectBundledPythonPath();
+  if (bundledPythonPath) {
+    return {
+      pythonMode: 'bundled',
+      pythonPath: bundledPythonPath,
+      bundledPythonPath,
+      systemPythonPath: detectPythonPath() || ''
+    };
+  }
+
+  const systemPythonPath = detectPythonPath();
+  if (systemPythonPath) {
+    return {
+      pythonMode: 'system',
+      pythonPath: systemPythonPath,
+      bundledPythonPath: '',
+      systemPythonPath
+    };
+  }
+
+  throw new Error('No Python runtime found. Packaged runtime is missing and no system Python was detected.');
+}
+
+function persistSetupConfig({ matlabPath, pythonPath, hfssPath, pythonMode, bundledPythonPath, systemPythonPath }) {
   const userConfigPath = getUserSetupConfigPath();
-  const config = buildSetupConfig({ matlabPath, pythonPath, hfssPath });
+  const config = buildSetupConfig({
+    matlabPath,
+    pythonPath,
+    hfssPath,
+    pythonMode,
+    bundledPythonPath,
+    systemPythonPath
+  });
 
   fs.mkdirSync(path.dirname(userConfigPath), { recursive: true });
   fs.writeFileSync(userConfigPath, JSON.stringify(config, null, 2), 'utf8');
@@ -193,7 +261,8 @@ function getImportNameFromPackage(packageName) {
   return mapping[packageName] || packageName.replace(/-/g, '_');
 }
 
-function ensurePythonRequirements(pythonPath) {
+function ensurePythonRequirements(pythonPath, options = {}) {
+  const mode = options?.pythonMode === 'bundled' ? 'bundled' : 'system';
   const requirementsPath = path.join(getProjectRoot(), 'OPEN_THIS', 'SETUP', 'requirements.txt');
   const packages = parseRequiredPythonPackages(requirementsPath);
   if (!packages.length) {
@@ -227,6 +296,12 @@ function ensurePythonRequirements(pythonPath) {
 
   if (!missingBeforeInstall.length) {
     return { checked: packages.length, installed: [], missingBeforeInstall: [] };
+  }
+
+  if (mode === 'bundled') {
+    throw new Error(
+      `Bundled Python runtime is missing required libraries: ${missingBeforeInstall.join(', ')}. Rebuild the bundled runtime with OPEN_THIS/SETUP/requirements.txt.`
+    );
   }
 
   const missingSet = new Set(missingBeforeInstall);
@@ -483,12 +558,24 @@ async function runSetupWizard() {
 }
 
 function registerDesktopIpcHandlers() {
-  ipcMain.handle('setup-wizard:get-initial-data', () => ({
-    matlabPath: detectMATLABPath(),
-    pythonPath: detectPythonPath(),
-    hfssPath: detectHFSSPath(),
-    setupConfigPath: getUserSetupConfigPath()
-  }));
+  ipcMain.handle('setup-wizard:get-initial-data', () => {
+    const setupConfigPath = getUserSetupConfigPath();
+
+    let existingConfig = null;
+    try {
+      if (fs.existsSync(setupConfigPath)) {
+        existingConfig = JSON.parse(fs.readFileSync(setupConfigPath, 'utf8'));
+      }
+    } catch {
+      existingConfig = null;
+    }
+
+    return {
+      matlabPath: existingConfig?.MATLAB_PATH || detectMATLABPath(),
+      hfssPath: existingConfig?.hfss?.exe_path || detectHFSSPath(),
+      setupConfigPath
+    };
+  });
 
   ipcMain.handle('setup-wizard:pick-file', async (_, payload) => {
     const picked = await dialog.showOpenDialog({
@@ -511,12 +598,24 @@ function registerDesktopIpcHandlers() {
 
   ipcMain.handle('setup-wizard:submit', async (_, payload) => {
     const matlabPath = (payload?.matlabPath || '').trim();
-    const pythonPath = (payload?.pythonPath || '').trim();
     const hfssPath = (payload?.hfssPath || '').trim();
 
+    const runtime = resolvePythonRuntime();
+    const pythonPath = runtime.pythonPath;
+    const pythonMode = runtime.pythonMode;
+    const bundledPythonPath = runtime.bundledPythonPath;
+    const systemPythonPath = runtime.systemPythonPath;
+
     validateSetupPaths({ matlabPath, pythonPath, hfssPath });
-    const pythonDeps = ensurePythonRequirements(pythonPath);
-    const configPath = persistSetupConfig({ matlabPath, pythonPath, hfssPath });
+    const pythonDeps = ensurePythonRequirements(pythonPath, { pythonMode });
+    const configPath = persistSetupConfig({
+      matlabPath,
+      pythonPath,
+      hfssPath,
+      pythonMode,
+      bundledPythonPath,
+      systemPythonPath
+    });
 
     if (setupWizardSession && !setupWizardSession.finished) {
       setupWizardSession.saved = true;

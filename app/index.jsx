@@ -351,7 +351,51 @@ const HomePage = () => {
         {/* Spacer */}
         <View style={styles.spacer} />
 
-        {/* Main Action Card */}
+{/* Progressive Tuning Card */}
+        <View style={styles.actionSection}>
+          <TouchableOpacity 
+            style={styles.primaryCard}
+            onPress={handleProgressiveTuningPress}
+            disabled={checkingTuningStatus}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#7c3aed', '#6d28d9', '#5b21b6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryCardGradient}
+            >
+              <View style={styles.primaryCardContent}>
+                <View style={styles.primaryCardHeader}>
+                  <View style={[styles.primaryCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                    <Text style={styles.primaryCardIconText}>📡</Text>
+                  </View>
+                  <View style={styles.primaryCardTexts}>
+                    <Text style={styles.primaryCardTitle}>Progressive Tuning</Text>
+                    <Text style={styles.primaryCardSubtitle}>Pre-optimize antenna parameters before MOEA/D/DE</Text>
+                  </View>
+                  <View style={styles.primaryCardArrow}>
+                    <Text style={styles.primaryCardArrowText}>{'>'}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.primaryCardFeatures}>
+                  <Text style={styles.primaryCardFeature}>3-Phase Tuning</Text>
+                  <Text style={styles.primaryCardFeature}>3-7x Speedup</Text>
+                  <Text style={styles.primaryCardFeature}>Range Tightening</Text>
+                </View>
+                {checkingTuningStatus && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                    <Text style={{ color: '#ffffff', marginLeft: 8, fontSize: 12 }}>Checking for active session...</Text>
+                  </View>
+                )}
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* MOEA tuning Card */}
         <View style={styles.actionSection}>
           <TouchableOpacity 
             style={styles.primaryCard}
@@ -375,8 +419,8 @@ const HomePage = () => {
                     />
                   </View>
                   <View style={styles.primaryCardTexts}>
-                    <Text style={styles.primaryCardTitle}>Run Antenna Optimization</Text>
-                    <Text style={styles.primaryCardSubtitle}>Execute MATLAB Live Scripts and monitor HFSS simulations</Text>
+                    <Text style={styles.primaryCardTitle}>Run MOEA/D/DE tuning</Text>
+                    <Text style={styles.primaryCardSubtitle}>Fully optimize the antenna design</Text>
                   </View>
                   <View style={styles.primaryCardArrow}>
                     <Text style={styles.primaryCardArrowText}>{'>'}</Text>
@@ -384,58 +428,14 @@ const HomePage = () => {
                 </View>
                 
                 <View style={styles.primaryCardFeatures}>
-                  <Text style={styles.primaryCardFeature}>Visual MATLAB UI</Text>
-                  <Text style={styles.primaryCardFeature}>Track Iterations</Text>
+                  <Text style={styles.primaryCardFeature}>Optimization Control</Text>
                   <Text style={styles.primaryCardFeature}>Start/Stop Control</Text>
+                  <Text style={styles.primaryCardFeature}>HFSS Simulation Monitoring</Text>
                 </View>
                 {checkingMatlabStatus && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
                     <ActivityIndicator size="small" color="#ffffff" />
                     <Text style={{ color: '#ffffff', marginLeft: 8, fontSize: 12 }}>Checking for active processes...</Text>
-                  </View>
-                )}
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Progressive Tuning Card */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity 
-            style={styles.primaryCard}
-            onPress={handleProgressiveTuningPress}
-            disabled={checkingTuningStatus}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#7c3aed', '#6d28d9', '#5b21b6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.primaryCardGradient}
-            >
-              <View style={styles.primaryCardContent}>
-                <View style={styles.primaryCardHeader}>
-                  <View style={[styles.primaryCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                    <Text style={styles.primaryCardIconText}>📡</Text>
-                  </View>
-                  <View style={styles.primaryCardTexts}>
-                    <Text style={styles.primaryCardTitle}>Progressive Tuning</Text>
-                    <Text style={styles.primaryCardSubtitle}>Pre-optimize antenna parameters before MOEA/D</Text>
-                  </View>
-                  <View style={styles.primaryCardArrow}>
-                    <Text style={styles.primaryCardArrowText}>{'>'}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.primaryCardFeatures}>
-                  <Text style={styles.primaryCardFeature}>3-Phase Tuning</Text>
-                  <Text style={styles.primaryCardFeature}>3-7x Speedup</Text>
-                  <Text style={styles.primaryCardFeature}>Range Tightening</Text>
-                </View>
-                {checkingTuningStatus && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                    <ActivityIndicator size="small" color="#ffffff" />
-                    <Text style={{ color: '#ffffff', marginLeft: 8, fontSize: 12 }}>Checking for active session...</Text>
                   </View>
                 )}
               </View>

@@ -5,6 +5,25 @@
     DetailPrint "Warning: ${label} still exists (${targetPath})"
 !macroend
 
+!macro customInstall
+  SetDetailsView show
+
+  DetailPrint "Preparing upgrade install (safe in-place update)..."
+  ExecWait 'taskkill /F /IM "Antenna Optimizer.exe" /T'
+  ExecWait 'taskkill /F /IM "Antenna-Optimizer.exe" /T'
+  ExecWait 'taskkill /F /IM "electron.exe" /T'
+  ExecWait 'taskkill /F /IM "node.exe" /T'
+
+  DetailPrint "Removing stale shortcuts (installer will recreate fresh ones)..."
+  Delete "$DESKTOP\Antenna Optimizer.lnk"
+  Delete "$DESKTOP\Antenna-Optimizer.lnk"
+  Delete "$SMPROGRAMS\Antenna Optimizer\Antenna Optimizer.lnk"
+  Delete "$SMPROGRAMS\Antenna Optimizer\Antenna-Optimizer.lnk"
+  Delete "$SMPROGRAMS\Antenna Optimizer\Uninstall Antenna Optimizer.lnk"
+
+  DetailPrint "Upgrade preparation complete. Installing latest version..."
+!macroend
+
 !macro customUnInstall
   SetDetailsView show
 

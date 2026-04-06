@@ -476,6 +476,32 @@ class ProgressiveTuningManager {
             `addpath(genpath(fullfile('${matlabDir}','Function','EARLY_PHASE')))`,
         ];
 
+        // Compatibility: some project variants of EP_Start.m don't accept
+        // dxf_min_x / dxf_min_y. Detect support from the project script and
+        // only pass those NV pairs when supported.
+        const epStartPath = path.join(earlyPhaseDir, 'Core', 'EP_Start.m');
+        let epStartSource = '';
+        try {
+            if (fs.existsSync(epStartPath)) {
+                epStartSource = await fsPromises.readFile(epStartPath, 'utf8');
+            }
+        } catch (err) {
+            logger.debug('[ProgressiveTuning] Failed reading EP_Start.m for NV compatibility check', {
+                path: epStartPath,
+                error: err.message,
+            });
+        }
+
+        const epSupportsParam = (paramName) => {
+            if (!epStartSource) return false;
+            const escaped = String(paramName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return (
+                new RegExp(`addParameter\\s*\\([^\\n\\r]*['\"]${escaped}['\"]`, 'i').test(epStartSource) ||
+                new RegExp(`case\\s*['\"]${escaped}['\"]`, 'i').test(epStartSource) ||
+                new RegExp(`['\"]${escaped}['\"]`, 'i').test(epStartSource)
+            );
+        };
+
         if (isResume) {
             // Resume mode: EP_Start('resume', 'antennaName') — no other params
             matlabStatements.push(`EP_Start('resume', '${effectiveName}')`);
@@ -491,8 +517,12 @@ class ProgressiveTuningManager {
                 if (gndConfig.yPos !== undefined) nvPairs.push(`'yPos', ${gndConfig.yPos}`);
                 if (gndConfig.Lgx !== undefined) nvPairs.push(`'Lgx', ${gndConfig.Lgx}`);
                 if (gndConfig.Lgy !== undefined) nvPairs.push(`'Lgy', ${gndConfig.Lgy}`);
-                if (gndConfig.dxf_min_x !== undefined) nvPairs.push(`'dxf_min_x', ${gndConfig.dxf_min_x}`);
-                if (gndConfig.dxf_min_y !== undefined) nvPairs.push(`'dxf_min_y', ${gndConfig.dxf_min_y}`);
+                if (gndConfig.dxf_min_x !== undefined && epSupportsParam('dxf_min_x')) {
+                    nvPairs.push(`'dxf_min_x', ${gndConfig.dxf_min_x}`);
+                }
+                if (gndConfig.dxf_min_y !== undefined && epSupportsParam('dxf_min_y')) {
+                    nvPairs.push(`'dxf_min_y', ${gndConfig.dxf_min_y}`);
+                }
             } else {
                 nvPairs.push(`'Lgx', ${gndConfig.Lgx}`);
                 nvPairs.push(`'Lgy', ${gndConfig.Lgy}`);
@@ -768,6 +798,43 @@ class ProgressiveTuningManager {
             throw new Error('No progressive tuning session active');
         }
 
+        const readJsonIfExists = async (filePath) => {
+            if (!fs.existsSync(filePath)) return null;
+            try {
+                const raw = await fsPromises.readFile(filePath, 'utf8');
+                return JSON.parse(raw);
+            } catch {
+                return null;
+            }
+        };
+
+        const parseTightenedRangesCsv = async (runDir) => {
+            const csvPath = path.join(runDir, 'tightened_ranges.csv');
+            if (!fs.existsSync(csvPath)) return {};
+
+            try {
+                const csvText = await fsPromises.readFile(csvPath, 'utf8');
+                const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
+                const tightened = {};
+
+                for (const line of lines) {
+                    const parts = line.split(',').map((part) => part.trim());
+                    if (parts.length < 3) continue;
+
+                    const [name, lo, hi] = parts;
+                    const loNum = parseFloat(lo);
+                    const hiNum = parseFloat(hi);
+                    if (Number.isNaN(loNum) || Number.isNaN(hiNum)) continue;
+
+                    tightened[name] = [loNum, hiNum];
+                }
+
+                return tightened;
+            } catch {
+                return {};
+            }
+        };
+
         const earlyPhaseDir = this._resolveEarlyPhaseDir(this.state.projectPath);
 
         // 1. Try to find profile.json in the most recent Results subfolder
@@ -775,16 +842,51 @@ class ProgressiveTuningManager {
         if (fs.existsSync(resultsBaseDir)) {
             try {
                 const entries = await fsPromises.readdir(resultsBaseDir, { withFileTypes: true });
-                // Check subfolders for profile.json (newest first by mtime)
-                const dirs = entries.filter(e => e.isDirectory());
-                for (const dir of dirs.reverse()) {
-                    const profilePath = path.join(resultsBaseDir, dir.name, 'profile.json');
-                    if (fs.existsSync(profilePath)) {
-                        const raw = await fsPromises.readFile(profilePath, 'utf8');
-                        const profile = JSON.parse(raw);
-                        this.state.cachedResults = profile;
-                        return profile;
+                // Check subfolders for run files (newest first by folder mtime)
+                const dirs = entries.filter((entry) => entry.isDirectory());
+                const dirsWithTime = [];
+                for (const dir of dirs) {
+                    const runDir = path.join(resultsBaseDir, dir.name);
+                    try {
+                        const stat = await fsPromises.stat(runDir);
+                        dirsWithTime.push({ dir, runDir, mtimeMs: stat.mtimeMs || 0 });
+                    } catch {
+                        dirsWithTime.push({ dir, runDir, mtimeMs: 0 });
                     }
+                }
+
+                dirsWithTime.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+                for (const { runDir } of dirsWithTime) {
+                    const profilePath = path.join(runDir, 'profile.json');
+                    const statusPath = path.join(runDir, 'status.json');
+
+                    const profile = await readJsonIfExists(profilePath);
+                    const status = await readJsonIfExists(statusPath);
+
+                    if (!profile && !status) {
+                        continue;
+                    }
+
+                    const merged = {
+                        ...(profile || {}),
+                        ...(status || {}),
+                        _runPath: runDir,
+                    };
+
+                    if (!merged.results_dir) {
+                        merged.results_dir = runDir;
+                    }
+
+                    if (!merged.tightened_ranges || Object.keys(merged.tightened_ranges).length === 0) {
+                        const tightenedFromCsv = await parseTightenedRangesCsv(runDir);
+                        if (Object.keys(tightenedFromCsv).length > 0) {
+                            merged.tightened_ranges = tightenedFromCsv;
+                        }
+                    }
+
+                    this.state.cachedResults = merged;
+                    return merged;
                 }
             } catch (err) {
                 logger.debug('[ProgressiveTuning] Error scanning Results for profile.json', { error: err.message });
