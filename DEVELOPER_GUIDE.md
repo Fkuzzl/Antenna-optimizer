@@ -50,11 +50,13 @@ This guide is for maintainers who will continue development, debugging, and rele
 ## 3) Developer Prerequisites
 
 - Windows 10/11 (primary supported development target)
-- Node.js 18+
-- npm
-- Python 3.8+
-- MATLAB
-- HFSS / Ansys Electronics Desktop
+
+- [ ] Install required tools:
+    - npm
+	- HFSS / Ansys Electronics Desktop (version before 2024 R1, go taobao buy crack for $20HKD)
+	- MATLAB (2023b is currently used; newer versions can be evaluated)
+	- Node.js 18+
+	- Python
 
 Install JS dependencies first:
 
@@ -194,3 +196,15 @@ This repository intentionally keeps only two root docs:
 
 1. `README.md` (normal users)
 2. `DEVELOPER_GUIDE.md` (maintainers/developers)
+
+---
+
+## 11) Project To-Do Checklist
+
+- [ ] Keep original MOEA verification logic for reference. It is currently unusable, you can delete it to enhance the entire flow.
+- [ ] Ensure port `3001` is available before starting the Node.js backend server.
+- [ ] test_files used for import GND design, 2D design only***
+- [ ] Before active application work, tune HFSS variables one-by-one to understand result sensitivity per variable.
+- [ ] Use AI assistance to explain each file by directory when onboarding or reviewing code.
+
+- Good luck
