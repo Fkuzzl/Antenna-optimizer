@@ -201,9 +201,8 @@ This repository intentionally keeps only two root docs:
 
 ## 11) Project To-Do Checklist
 
-- [ ] Keep original MOEA verification logic for reference. It is currently unusable, you can delete it to enhance the entire flow.
 - [ ] Ensure port `3001` is available before starting the Node.js backend server.
-- [ ] test_files used for import GND design, 2D design only***
+- [ ] test_files used for import GND design, dxf format 2D design only***
 - [ ] Before active application work, tune HFSS variables one-by-one to understand result sensitivity per variable.
 - [ ] Use AI assistance to explain each file by directory when onboarding or reviewing code.
 
